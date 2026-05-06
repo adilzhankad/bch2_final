@@ -1,0 +1,7 @@
+out/
+cache/
+broadcast/
+.env
+.env.local
+*.swp
+*.swo
