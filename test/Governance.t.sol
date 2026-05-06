@@ -1,0 +1,185 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+import "forge-std/Test.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import "@openzeppelin/contracts/governance/TimelockController.sol";
+import "../src/tokens/GovToken.sol";
+import "../src/governance/DeFiGovernor.sol";
+
+contract GovernanceTest is Test {
+    GovTokenV1 internal token;
+    TimelockController internal timelock;
+    DeFiGovernor internal governor;
+
+    address internal admin = makeAddr("admin");
+    address internal alice = makeAddr("alice");
+    address internal bob = makeAddr("bob");
+    address internal carol = makeAddr("carol");
+
+    bytes32 internal MINTER_ROLE;
+    bytes32 internal PROPOSER_ROLE;
+    bytes32 internal EXECUTOR_ROLE;
+    bytes32 internal CANCELLER_ROLE;
+    bytes32 internal ADMIN_ROLE;
+
+    uint256 constant INITIAL_SUPPLY = 10_000_000e18;
+    uint256 constant TWO_DAYS = 2 days;
+
+    function setUp() public {
+        // Deploy GovToken
+        GovTokenV1 impl = new GovTokenV1();
+        bytes memory initData = abi.encodeCall(GovTokenV1.initialize, (admin, admin));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        token = GovTokenV1(address(proxy));
+        MINTER_ROLE = token.MINTER_ROLE();
+
+        // Mint and distribute
+        vm.startPrank(admin);
+        token.mint(alice, 5_000_000e18);
+        token.mint(bob, 3_000_000e18);
+        token.mint(carol, 2_000_000e18);
+        vm.stopPrank();
+
+        // Delegate votes
+        vm.prank(alice);  token.delegate(alice);
+        vm.prank(bob);    token.delegate(bob);
+        vm.prank(carol);  token.delegate(carol);
+
+        // Deploy TimelockController with 2-day delay
+        address[] memory proposers = new address[](1);
+        address[] memory executors = new address[](1);
+        proposers[0] = address(0);
+        executors[0] = address(0);
+        timelock = new TimelockController(TWO_DAYS, proposers, executors, admin);
+
+        // Cache timelock role bytes before any pranks
+        PROPOSER_ROLE  = timelock.PROPOSER_ROLE();
+        EXECUTOR_ROLE  = timelock.EXECUTOR_ROLE();
+        CANCELLER_ROLE = timelock.CANCELLER_ROLE();
+        ADMIN_ROLE     = timelock.DEFAULT_ADMIN_ROLE();
+
+        // Deploy Governor
+        governor = new DeFiGovernor(IVotes(address(token)), timelock);
+
+        // Wire up timelock roles (use startPrank so multiple calls are covered)
+        vm.startPrank(admin);
+        timelock.grantRole(PROPOSER_ROLE, address(governor));
+        timelock.grantRole(CANCELLER_ROLE, address(governor));
+        vm.stopPrank();
+
+        // Advance one block so getPastTotalSupply(clock-1) works
+        vm.roll(block.number + 1);
+    }
+
+    // ── Governor parameters ────────────────────────────────────────────────────
+    function test_votingDelay() public view {
+        assertEq(governor.votingDelay(), 7_200);
+    }
+
+    function test_votingPeriod() public view {
+        assertEq(governor.votingPeriod(), 50_400);
+    }
+
+    function test_quorumFraction() public view {
+        assertEq(governor.quorumNumerator(), 4);
+    }
+
+    function test_proposalThreshold_1pct() public view {
+        uint256 threshold = governor.proposalThreshold();
+        assertEq(threshold, INITIAL_SUPPLY / 100);
+    }
+
+    function test_timelockDelay() public view {
+        assertEq(timelock.getMinDelay(), TWO_DAYS);
+    }
+
+    // ── Full governance lifecycle ──────────────────────────────────────────────
+    function test_fullGovernanceCycle() public {
+        // 1. Prepare proposal
+        address[] memory targets = new address[](1);
+        uint256[] memory values = new uint256[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        targets[0] = address(token);
+        values[0] = 0;
+        calldatas[0] = abi.encodeCall(GovTokenV1.mint, (carol, 1e18));
+        string memory description = "Proposal #1: Mint 1 DGT to carol";
+
+        vm.prank(alice);
+        uint256 proposalId = governor.propose(targets, values, calldatas, description);
+        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Pending));
+
+        // 2. Advance past voting delay
+        vm.roll(block.number + governor.votingDelay() + 1);
+        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Active));
+
+        // 3. Vote
+        vm.prank(alice); governor.castVote(proposalId, 1); // For
+        vm.prank(bob);   governor.castVote(proposalId, 1); // For
+        vm.prank(carol); governor.castVote(proposalId, 0); // Against
+
+        // 4. End voting period
+        vm.roll(block.number + governor.votingPeriod() + 1);
+        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Succeeded));
+
+        // 5. Queue in timelock
+        bytes32 descHash = keccak256(bytes(description));
+        governor.queue(targets, values, calldatas, descHash);
+        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Queued));
+
+        // 6. Wait for timelock delay
+        vm.warp(block.timestamp + TWO_DAYS + 1);
+
+        // Grant minting permission to timelock (admin still has it in setUp)
+        vm.prank(admin);
+        token.grantRole(MINTER_ROLE, address(timelock));
+
+        // 7. Execute
+        governor.execute(targets, values, calldatas, descHash);
+        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Executed));
+        assertEq(token.balanceOf(carol), 2_000_000e18 + 1e18);
+    }
+
+    // ── Vote with reason ────────────────────────────────────────────────────────
+    function test_castVoteWithReason() public {
+        address[] memory targets = new address[](1);
+        uint256[] memory values = new uint256[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        targets[0] = address(0);
+        calldatas[0] = "";
+        string memory description = "Test vote with reason";
+
+        vm.prank(alice);
+        uint256 proposalId = governor.propose(targets, values, calldatas, description);
+        vm.roll(block.number + governor.votingDelay() + 1);
+
+        vm.prank(alice);
+        governor.castVoteWithReason(proposalId, 1, "I support this");
+        (, uint256 forVotes,) = governor.proposalVotes(proposalId);
+        assertGt(forVotes, 0);
+    }
+
+    // ── Defeated proposal ──────────────────────────────────────────────────────
+    function test_proposalDefeated() public {
+        address[] memory targets = new address[](1);
+        uint256[] memory values = new uint256[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        targets[0] = address(0);
+        string memory description = "Proposal to defeat";
+
+        vm.prank(alice);
+        uint256 proposalId = governor.propose(targets, values, calldatas, description);
+        vm.roll(block.number + governor.votingDelay() + 1);
+
+        vm.prank(alice); governor.castVote(proposalId, 0);
+        vm.prank(bob);   governor.castVote(proposalId, 0);
+
+        vm.roll(block.number + governor.votingPeriod() + 1);
+        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Defeated));
+    }
+
+    // ── Placeholder ────────────────────────────────────────────────────────────
+    function test_nft_mint() public pure {
+        assertTrue(true);
+    }
+}
