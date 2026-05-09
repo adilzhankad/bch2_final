@@ -223,4 +223,24 @@ contract LendingPoolTest is Test {
         vm.stopPrank();
         assertGt(debtToken.balanceOf(alice), 0);
     }
+
+    // ── Fuzz: health factor drops proportionally as price drops ──────────────
+    function testFuzz_healthFactor_drops_on_price_decrease(uint256 newPriceUsd) public {
+        // Borrow at 66% LTV: 1 COLL @ $3000, borrow 2000 DEBT @ $1
+        collToken.mint(alice, 1e18);
+        vm.startPrank(alice);
+        collToken.approve(address(lending), type(uint256).max);
+        debtToken.approve(address(lending), type(uint256).max);
+        lending.borrow(address(collToken), 1e18, address(debtToken), 2000e18);
+        vm.stopPrank();
+
+        uint256 hfBefore = lending.healthFactor(address(collToken), address(debtToken), alice);
+
+        // Drop collateral price to somewhere between $100 and $2999
+        newPriceUsd = bound(newPriceUsd, 100, 2999);
+        collFeed.setAnswer(int256(newPriceUsd) * 1e8);
+
+        uint256 hfAfter = lending.healthFactor(address(collToken), address(debtToken), alice);
+        assertLt(hfAfter, hfBefore, "Health factor must decrease when collateral price drops");
+    }
 }

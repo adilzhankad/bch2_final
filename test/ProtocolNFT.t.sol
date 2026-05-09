@@ -108,4 +108,19 @@ contract ProtocolNFTTest is Test {
         emit ProtocolNFT.Minted(alice, 0, "token0");
         nft.safeMint(alice, "token0");
     }
+
+    // ── Fuzz: token IDs are always sequential starting from 0 ────────────────
+    function testFuzz_tokenIds_sequential(uint8 count) public {
+        // Bound to 1-50 mints to keep runtime reasonable
+        count = uint8(bound(count, 1, 50));
+
+        vm.startPrank(minter);
+        for (uint256 i = 0; i < count; i++) {
+            uint256 id = nft.safeMint(alice, "uri");
+            assertEq(id, i, "Token ID must match mint order");
+        }
+        vm.stopPrank();
+
+        assertEq(nft.totalSupply(), count, "totalSupply must equal number of mints");
+    }
 }

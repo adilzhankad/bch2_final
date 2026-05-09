@@ -149,4 +149,25 @@ contract GovTokenTest is Test {
     function test_clock() public view {
         assertEq(token.clock(), uint48(block.number));
     }
+
+    // ── Fuzz: delegated voting power always equals delegator's balance ────────
+    function testFuzz_votingPower_equals_balance_after_delegation(uint256 mintAmount) public {
+        mintAmount = bound(mintAmount, 1, token.MAX_SUPPLY() - token.totalSupply());
+
+        vm.prank(minter);
+        token.mint(alice, mintAmount);
+
+        // Self-delegate so votes are activated
+        vm.prank(alice);
+        token.delegate(alice);
+
+        assertEq(token.getVotes(alice), mintAmount, "Votes must equal balance after self-delegation");
+
+        // Delegate to bob — all votes move to bob, alice drops to zero
+        vm.prank(alice);
+        token.delegate(bob);
+
+        assertEq(token.getVotes(bob),   mintAmount, "Bob must receive all delegated votes");
+        assertEq(token.getVotes(alice), 0,          "Alice must have zero votes after delegation");
+    }
 }

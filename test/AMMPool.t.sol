@@ -194,4 +194,38 @@ contract AMMPoolTest is Test {
         assertGt(got0, 0);
         assertGt(got1, 0);
     }
+
+    // ── Fuzz: swapExactOut preserves k invariant ──────────────────────────────
+    function testFuzz_swapExactOut_kInvariant(uint256 amountOut) public {
+        // Bound amountOut to at most 10% of reserve to keep the pool healthy
+        (uint256 r0, uint256 r1) = pool.getReserves();
+        amountOut = bound(amountOut, 1e15, r1 / 10);
+
+        uint256 kBefore = r0 * r1;
+
+        // swapExactOut(0, amountOut, ...) is a "token0 in → token1 out" swap.
+        // We must fund bob with pool.token0(), not necessarily tokenA.
+        MockERC20 inToken = address(pool.token0()) == address(tokenA) ? tokenA : tokenB;
+        uint256 amountInMax = pool.getAmountIn(amountOut, true) * 2;
+        inToken.mint(bob, amountInMax);
+        vm.startPrank(bob);
+        inToken.approve(address(pool), type(uint256).max);
+        pool.swapExactOut(0, amountOut, amountInMax, bob);
+        vm.stopPrank();
+
+        (uint256 newR0, uint256 newR1) = pool.getReserves();
+        assertGe(newR0 * newR1, kBefore, "k must not decrease after swapExactOut");
+    }
+
+    // ── Fuzz: getAmountOut / getAmountIn are consistent ──────────────────────
+    function testFuzz_getAmountOut_amountIn_roundtrip(uint256 amountOut) public view {
+        (uint256 r0, uint256 r1) = pool.getReserves();
+        amountOut = bound(amountOut, 1e15, r1 / 10);
+
+        // amountIn needed to buy amountOut of token1 (zeroForOne = true)
+        uint256 amountIn = pool.getAmountIn(amountOut, true);
+        // The actual output for that amountIn must be >= amountOut (rounding favours pool)
+        uint256 actualOut = pool.getAmountOut(amountIn, true);
+        assertGe(actualOut, amountOut, "Roundtrip: output must cover requested amountOut");
+    }
 }
