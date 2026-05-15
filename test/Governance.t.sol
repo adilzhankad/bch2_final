@@ -5,7 +5,9 @@ import "forge-std/Test.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@openzeppelin/contracts/governance/TimelockController.sol";
 import "../src/tokens/GovToken.sol";
+import "../src/tokens/ProtocolNFT.sol";
 import "../src/governance/DeFiGovernor.sol";
+import "../src/governance/Treasury.sol";
 
 contract GovernanceTest is Test {
     GovTokenV1 internal token;
@@ -178,8 +180,90 @@ contract GovernanceTest is Test {
         assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Defeated));
     }
 
-    // ── Placeholder ────────────────────────────────────────────────────────────
-    function test_nft_mint() public pure {
-        assertTrue(true);
+    // ── NFT mint ───────────────────────────────────────────────────────────────
+    function test_nft_mint_byMinter() public {
+        address nftAdmin = makeAddr("nftAdmin");
+        ProtocolNFT nft = new ProtocolNFT(nftAdmin, "ipfs://base/");
+
+        vm.prank(nftAdmin);
+        uint256 tokenId = nft.safeMint(alice, "ipfs://base/1.json");
+
+        assertEq(nft.ownerOf(tokenId), alice);
+        assertEq(nft.totalSupply(), 1);
+        assertEq(tokenId, 0);
+    }
+
+    function test_nft_mint_revert_notMinter() public {
+        address nftAdmin = makeAddr("nftAdmin");
+        ProtocolNFT nft = new ProtocolNFT(nftAdmin, "ipfs://base/");
+
+        vm.expectRevert();
+        vm.prank(alice);
+        nft.safeMint(alice, "ipfs://base/1.json");
+    }
+
+    // ── Governance fuzz tests ──────────────────────────────────────────────────
+    function test_timelock_controls_treasury() public {
+        Treasury treasury = new Treasury(address(timelock));
+
+        vm.deal(address(treasury), 1 ether);
+        assertEq(address(treasury).balance, 1 ether);
+
+        address[] memory targets = new address[](1);
+        uint256[] memory values = new uint256[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        targets[0] = address(treasury);
+        values[0] = 0;
+        calldatas[0] = abi.encodeCall(Treasury.releaseETH, (payable(carol), 0.5 ether));
+        string memory description = "Proposal: release 0.5 ETH to carol";
+
+        vm.prank(alice);
+        uint256 proposalId = governor.propose(targets, values, calldatas, description);
+
+        vm.roll(block.number + governor.votingDelay() + 1);
+        vm.prank(alice); governor.castVote(proposalId, 1);
+        vm.prank(bob);   governor.castVote(proposalId, 1);
+
+        vm.roll(block.number + governor.votingPeriod() + 1);
+        bytes32 descHash = keccak256(bytes(description));
+        governor.queue(targets, values, calldatas, descHash);
+
+        vm.warp(block.timestamp + TWO_DAYS + 1);
+        governor.execute(targets, values, calldatas, descHash);
+
+        assertEq(carol.balance, 0.5 ether);
+    }
+
+    function testFuzz_votingPower_equalsDelegatedBalance(uint256 amount) public {
+        amount = bound(amount, 1, 1_000_000e18);
+
+        address voter = makeAddr("voter");
+        vm.prank(admin);
+        token.mint(voter, amount);
+
+        vm.prank(voter);
+        token.delegate(voter);
+
+        // Advance one block so getPastVotes works
+        vm.roll(block.number + 1);
+
+        assertEq(token.getVotes(voter), amount);
+        assertEq(token.getPastVotes(voter, block.number - 1), amount);
+    }
+
+    function testFuzz_quorum_scalesWithTotalSupply(uint256 extraMint) public {
+        extraMint = bound(extraMint, 1e18, 1_000_000e18);
+
+        uint256 supplyBefore = token.totalSupply();
+        uint256 quorumBefore = governor.quorum(block.number - 1);
+
+        vm.prank(admin);
+        token.mint(makeAddr("extra"), extraMint);
+        vm.roll(block.number + 1);
+
+        uint256 quorumAfter = governor.quorum(block.number - 1);
+
+        assertGt(token.totalSupply(), supplyBefore);
+        assertGt(quorumAfter, quorumBefore, "Quorum must increase as supply grows");
     }
 }
