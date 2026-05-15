@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@openzeppelin/contracts/governance/TimelockController.sol";
 import "../src/tokens/GovToken.sol";
+import "../src/tokens/ProtocolNFT.sol";
 import "../src/governance/DeFiGovernor.sol";
 
 contract GovernanceTest is Test {
@@ -178,8 +179,59 @@ contract GovernanceTest is Test {
         assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Defeated));
     }
 
-    // ── Placeholder ────────────────────────────────────────────────────────────
-    function test_nft_mint() public pure {
-        assertTrue(true);
+    // ── NFT mint ───────────────────────────────────────────────────────────────
+    function test_nft_mint_byMinter() public {
+        address nftAdmin = makeAddr("nftAdmin");
+        ProtocolNFT nft = new ProtocolNFT(nftAdmin, "ipfs://base/");
+
+        vm.prank(nftAdmin);
+        uint256 tokenId = nft.safeMint(alice, "ipfs://base/1.json");
+
+        assertEq(nft.ownerOf(tokenId), alice);
+        assertEq(nft.totalSupply(), 1);
+        assertEq(tokenId, 0);
+    }
+
+    function test_nft_mint_revert_notMinter() public {
+        address nftAdmin = makeAddr("nftAdmin");
+        ProtocolNFT nft = new ProtocolNFT(nftAdmin, "ipfs://base/");
+
+        vm.expectRevert();
+        vm.prank(alice);
+        nft.safeMint(alice, "ipfs://base/1.json");
+    }
+
+    // ── Governance fuzz tests ──────────────────────────────────────────────────
+    function testFuzz_votingPower_equalsDelegatedBalance(uint256 amount) public {
+        amount = bound(amount, 1, 1_000_000e18);
+
+        address voter = makeAddr("voter");
+        vm.prank(admin);
+        token.mint(voter, amount);
+
+        vm.prank(voter);
+        token.delegate(voter);
+
+        // Advance one block so getPastVotes works
+        vm.roll(block.number + 1);
+
+        assertEq(token.getVotes(voter), amount);
+        assertEq(token.getPastVotes(voter, block.number - 1), amount);
+    }
+
+    function testFuzz_quorum_scalesWithTotalSupply(uint256 extraMint) public {
+        extraMint = bound(extraMint, 1e18, 1_000_000e18);
+
+        uint256 supplyBefore = token.totalSupply();
+        uint256 quorumBefore = governor.quorum(block.number - 1);
+
+        vm.prank(admin);
+        token.mint(makeAddr("extra"), extraMint);
+        vm.roll(block.number + 1);
+
+        uint256 quorumAfter = governor.quorum(block.number - 1);
+
+        assertGt(token.totalSupply(), supplyBefore);
+        assertGt(quorumAfter, quorumBefore, "Quorum must increase as supply grows");
     }
 }
