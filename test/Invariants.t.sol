@@ -13,7 +13,6 @@ contract MockERC20Mintable is ERC20 {
     function mint(address to, uint256 amount) external { _mint(to, amount); }
 }
 
-// ── AMM k-invariant handler ────────────────────────────────────────────────────
 contract AMMHandler is Test {
     AMMPool public pool;
     MockERC20Mintable public token0;
@@ -26,7 +25,6 @@ contract AMMHandler is Test {
     constructor() {
         token0 = new MockERC20Mintable("T0", "T0");
         token1 = new MockERC20Mintable("T1", "T1");
-        // Ensure token0 < token1 for deterministic pool ordering
         if (address(token0) > address(token1)) {
             (token0, token1) = (token1, token0);
         }
@@ -39,7 +37,6 @@ contract AMMHandler is Test {
         vm.prank(actor);
         token1.approve(address(pool), type(uint256).max);
 
-        // Seed liquidity
         vm.prank(actor);
         pool.addLiquidity(100_000e18, 100_000e18, 0, 0, actor);
         ghost_totalIn0 = 100_000e18;
@@ -70,7 +67,6 @@ contract AMMHandler is Test {
     }
 }
 
-// ── GovToken supply handler ────────────────────────────────────────────────────
 contract GovTokenHandler is Test {
     GovTokenV1 public token;
     address internal admin = makeAddr("admin");
@@ -105,7 +101,47 @@ contract GovTokenHandler is Test {
     }
 }
 
-// ── Invariant tests ────────────────────────────────────────────────────────────
+contract VaultHandler is Test {
+    YieldVaultV1 public vault;
+    MockERC20Mintable public asset;
+    address internal actor = makeAddr("vaultActor");
+
+    uint256 public ghost_totalDeposited;
+    uint256 public ghost_totalWithdrawn;
+
+    constructor() {
+        asset = new MockERC20Mintable("MockAsset", "mA");
+        YieldVaultV1 impl = new YieldVaultV1();
+        bytes memory initData = abi.encodeCall(
+            YieldVaultV1.initialize,
+            (address(asset), "Vault", "vTKN", address(this))
+        );
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        vault = YieldVaultV1(address(proxy));
+
+        asset.mint(actor, 10_000_000e18);
+        vm.prank(actor);
+        asset.approve(address(vault), type(uint256).max);
+    }
+
+    function deposit(uint256 assets) public {
+        assets = bound(assets, 1e6, 100_000e18);
+        asset.mint(actor, assets);
+        vm.prank(actor);
+        vault.deposit(assets, actor);
+        ghost_totalDeposited += assets;
+    }
+
+    function redeem(uint256 shares) public {
+        uint256 bal = vault.balanceOf(actor);
+        if (bal == 0) return;
+        shares = bound(shares, 1, bal);
+        vm.prank(actor);
+        uint256 assetsOut = vault.redeem(shares, actor, actor);
+        ghost_totalWithdrawn += assetsOut;
+    }
+}
+
 contract AMMInvariantTest is Test {
     AMMHandler internal handler;
 
@@ -114,15 +150,12 @@ contract AMMInvariantTest is Test {
         targetContract(address(handler));
     }
 
-    /// @dev k = reserve0 * reserve1 must never decrease after swaps
     function invariant_k_never_decreases() public view {
         (uint256 r0, uint256 r1) = handler.pool().getReserves();
-        // After initial liquidity: k0 = 100_000e18 * 100_000e18
         uint256 k0 = 100_000e18 * 100_000e18;
         assertGe(r0 * r1, k0);
     }
 
-    /// @dev Total LP supply must be > MINIMUM_LIQUIDITY when reserves > 0
     function invariant_lpSupply_positive() public view {
         uint256 ts = handler.pool().totalSupply();
         (uint256 r0, uint256 r1) = handler.pool().getReserves();
@@ -131,7 +164,6 @@ contract AMMInvariantTest is Test {
         }
     }
 
-    /// @dev Reserves must equal actual token balances
     function invariant_reserves_match_balances() public view {
         (uint256 r0, uint256 r1) = handler.pool().getReserves();
         uint256 bal0 = handler.token0().balanceOf(address(handler.pool()));
@@ -149,7 +181,6 @@ contract GovTokenInvariantTest is Test {
         targetContract(address(handler));
     }
 
-    /// @dev totalSupply == sum(minted) - sum(burned)
     function invariant_totalSupply_conservation() public view {
         assertEq(
             handler.token().totalSupply(),
@@ -157,15 +188,55 @@ contract GovTokenInvariantTest is Test {
         );
     }
 
-    /// @dev totalSupply never exceeds MAX_SUPPLY
     function invariant_maxSupply_never_exceeded() public view {
         assertLe(handler.token().totalSupply(), handler.token().MAX_SUPPLY());
     }
 
-    /// @dev No individual balance exceeds totalSupply
     function invariant_balance_le_totalSupply() public view {
-        // Check admin balance (the only funded actor in handler after burns)
         address minter = handler.minter();
         assertLe(handler.token().balanceOf(minter), handler.token().totalSupply());
+    }
+}
+
+contract VaultInvariantTest is Test {
+    VaultHandler internal handler;
+
+    function setUp() public {
+        handler = new VaultHandler();
+        targetContract(address(handler));
+
+        address actor = makeAddr("vaultActor");
+        handler.asset().mint(actor, 1000e18);
+        vm.prank(actor);
+        handler.asset().approve(address(handler.vault()), type(uint256).max);
+        vm.prank(actor);
+        handler.vault().deposit(1000e18, actor);
+    }
+
+    function invariant_convertShares_roundtrip() public view {
+        YieldVaultV1 vault = handler.vault();
+        uint256 shares = 1e18;
+        uint256 assets = vault.convertToAssets(shares);
+        uint256 sharesBack = vault.convertToShares(assets);
+        assertLe(sharesBack, shares);
+    }
+
+    function invariant_convertAssets_roundtrip() public view {
+        YieldVaultV1 vault = handler.vault();
+        uint256 assets = 1e18;
+        uint256 shares = vault.convertToShares(assets);
+        uint256 assetsBack = vault.convertToAssets(shares);
+        assertLe(assetsBack, assets);
+    }
+
+    function invariant_totalAssets_matches_balance() public view {
+        YieldVaultV1 vault = handler.vault();
+        assertEq(vault.totalAssets(), handler.asset().balanceOf(address(vault)));
+    }
+
+    function invariant_totalAssets_ge_net_deposits() public view {
+        YieldVaultV1 vault = handler.vault();
+        uint256 net = handler.ghost_totalDeposited() - handler.ghost_totalWithdrawn();
+        assertGe(vault.totalAssets(), net);
     }
 }
