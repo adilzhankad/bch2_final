@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/governance/TimelockController.sol";
 import "../src/tokens/GovToken.sol";
 import "../src/tokens/ProtocolNFT.sol";
 import "../src/governance/DeFiGovernor.sol";
+import "../src/governance/Treasury.sol";
 
 contract GovernanceTest is Test {
     GovTokenV1 internal token;
@@ -202,6 +203,37 @@ contract GovernanceTest is Test {
     }
 
     // ── Governance fuzz tests ──────────────────────────────────────────────────
+    function test_timelock_controls_treasury() public {
+        Treasury treasury = new Treasury(address(timelock));
+
+        vm.deal(address(treasury), 1 ether);
+        assertEq(address(treasury).balance, 1 ether);
+
+        address[] memory targets = new address[](1);
+        uint256[] memory values = new uint256[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        targets[0] = address(treasury);
+        values[0] = 0;
+        calldatas[0] = abi.encodeCall(Treasury.releaseETH, (payable(carol), 0.5 ether));
+        string memory description = "Proposal: release 0.5 ETH to carol";
+
+        vm.prank(alice);
+        uint256 proposalId = governor.propose(targets, values, calldatas, description);
+
+        vm.roll(block.number + governor.votingDelay() + 1);
+        vm.prank(alice); governor.castVote(proposalId, 1);
+        vm.prank(bob);   governor.castVote(proposalId, 1);
+
+        vm.roll(block.number + governor.votingPeriod() + 1);
+        bytes32 descHash = keccak256(bytes(description));
+        governor.queue(targets, values, calldatas, descHash);
+
+        vm.warp(block.timestamp + TWO_DAYS + 1);
+        governor.execute(targets, values, calldatas, descHash);
+
+        assertEq(carol.balance, 0.5 ether);
+    }
+
     function testFuzz_votingPower_equalsDelegatedBalance(uint256 amount) public {
         amount = bound(amount, 1, 1_000_000e18);
 

@@ -14,6 +14,7 @@ import "../src/core/YieldVault.sol";
 import "../src/core/PriceOracle.sol";
 import "../src/core/MockAggregatorV3.sol";
 import "../src/governance/DeFiGovernor.sol";
+import "../src/governance/Treasury.sol";
 
 /// @title Deploy — idempotent deployment script for L2 testnet (Optimism Sepolia)
 contract Deploy is Script {
@@ -28,6 +29,7 @@ contract Deploy is Script {
     address public lendingAddr;
     address public vaultProxy;
     address public ethOracleAddr;
+    address public treasuryAddr;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -68,6 +70,9 @@ contract Deploy is Script {
         timelock.grantRole(timelock.PROPOSER_ROLE(), governorAddr);
         timelock.grantRole(timelock.EXECUTOR_ROLE(), address(0));
         timelock.revokeRole(timelock.DEFAULT_ADMIN_ROLE(), deployer);
+
+        treasuryAddr = address(new Treasury(timelockAddr));
+        console.log("Treasury:", treasuryAddr);
     }
 
     function _deployCore(address deployer) internal {
@@ -93,6 +98,7 @@ contract Deploy is Script {
         );
         vaultProxy = address(new ERC1967Proxy(address(vaultImpl), vaultInit));
         console.log("YieldVault proxy:", vaultProxy);
+        console.log("Treasury:        ", treasuryAddr);
     }
 
     function _logSummary(address deployer) internal view {
