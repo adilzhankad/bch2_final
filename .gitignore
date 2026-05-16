@@ -5,3 +5,4 @@ broadcast/
 .env.local
 *.swp
 *.swo
+foundry.lock

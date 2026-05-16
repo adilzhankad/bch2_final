@@ -203,14 +203,10 @@ contract VaultInvariantTest is Test {
 
     function setUp() public {
         handler = new VaultHandler();
+        // Seed the vault via the handler so ghost accounting stays consistent
+        // with the invariant `totalAssets >= ghost_deposited - ghost_withdrawn`.
+        handler.deposit(1000e18);
         targetContract(address(handler));
-
-        address actor = makeAddr("vaultActor");
-        handler.asset().mint(actor, 1000e18);
-        vm.prank(actor);
-        handler.asset().approve(address(handler.vault()), type(uint256).max);
-        vm.prank(actor);
-        handler.vault().deposit(1000e18, actor);
     }
 
     function invariant_convertShares_roundtrip() public view {
