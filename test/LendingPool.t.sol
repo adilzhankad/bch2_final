@@ -140,6 +140,46 @@ contract LendingPoolTest is Test {
         vm.stopPrank();
     }
 
+    function test_repay_partial_returns_proportional_collateral() public {
+        collToken.mint(alice, 1e18);
+        vm.startPrank(alice);
+        collToken.approve(address(lending), type(uint256).max);
+        debtToken.approve(address(lending), type(uint256).max);
+        // 1 COLL @ $3000, borrow 2000 DEBT (LTV 66%)
+        lending.borrow(address(collToken), 1e18, address(debtToken), 2000e18);
+
+        // Repay exactly half
+        uint256 collBefore = collToken.balanceOf(alice);
+        uint256 returned = lending.repay(address(collToken), address(debtToken), 1000e18);
+        vm.stopPrank();
+
+        // Should get back exactly 50% of collateral (0.5e18)
+        assertEq(returned, 0.5e18, "50% repay must return 50% collateral");
+        assertEq(collToken.balanceOf(alice), collBefore + returned, "Collateral sent to alice");
+
+        // Remaining position: 0.5 COLL, 1000 DEBT — still healthy
+        uint256 hf = lending.healthFactor(address(collToken), address(debtToken), alice);
+        assertGe(hf, 1e18, "Health factor must stay >= 1 after proportional repay");
+    }
+
+    function test_repay_partial_health_factor_preserved() public {
+        collToken.mint(alice, 1e18);
+        vm.startPrank(alice);
+        collToken.approve(address(lending), type(uint256).max);
+        debtToken.approve(address(lending), type(uint256).max);
+        lending.borrow(address(collToken), 1e18, address(debtToken), 2000e18);
+
+        uint256 hfBefore = lending.healthFactor(address(collToken), address(debtToken), alice);
+
+        // Partial repay (25%)
+        lending.repay(address(collToken), address(debtToken), 500e18);
+        vm.stopPrank();
+
+        uint256 hfAfter = lending.healthFactor(address(collToken), address(debtToken), alice);
+        // HF should be unchanged (proportional collateral returned keeps ratio same)
+        assertApproxEqRel(hfAfter, hfBefore, 1e15, "Health factor must stay equal after proportional repay");
+    }
+
     // ── Liquidation ───────────────────────────────────────────────────────────
     function test_liquidate_succeeds() public {
         collToken.mint(alice, 1e18);

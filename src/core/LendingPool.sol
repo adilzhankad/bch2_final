@@ -165,13 +165,17 @@ contract LendingPool is ReentrancyGuard, AccessControl {
         pos.debtAmount -= repayAmount;
         totalBorrowed[debtToken] -= repayAmount;
 
-        // Return proportional collateral
+        // Return collateral proportional to the fraction of debt repaid.
+        // Math: collateral_returned = collateral * repayAmount / debtBefore
+        // where debtBefore = pos.debtAmount (already reduced) + repayAmount.
+        // This keeps health factor unchanged after a partial repay.
         if (pos.debtAmount == 0) {
             collateralReturned = pos.collateralAmount;
             pos.collateralAmount = 0;
         } else {
-            // return collateral proportional to repayment
-            collateralReturned = 0;
+            uint256 debtBefore = pos.debtAmount + repayAmount;
+            collateralReturned = (pos.collateralAmount * repayAmount) / debtBefore;
+            pos.collateralAmount -= collateralReturned;
         }
         if (collateralReturned > 0) {
             IERC20(collateralToken).safeTransfer(msg.sender, collateralReturned);
