@@ -68,7 +68,7 @@ contract LendingPoolTest is Test {
         collToken.approve(address(lending), type(uint256).max);
         lending.deposit(address(collToken), 100e18);
         vm.stopPrank();
-        assertEq(lending.totalDeposited(address(collToken)), 100e18);
+        assertEq(lending.totalCollateral(address(collToken)), 100e18);
     }
 
     function test_deposit_revert_zeroAmount() public {
@@ -87,7 +87,7 @@ contract LendingPoolTest is Test {
 
     // ── depositLiquidity ──────────────────────────────────────────────────────
     function test_depositLiquidity_succeeds() public view {
-        assertEq(lending.totalDeposited(address(debtToken)), POOL_LIQUIDITY);
+        assertEq(lending.totalLiquidity(address(debtToken)), POOL_LIQUIDITY);
     }
 
     function test_depositLiquidity_revert_notBorrowable() public {
@@ -246,6 +246,67 @@ contract LendingPoolTest is Test {
         collFeed.setAnswer(-1);
         vm.expectRevert(PriceOracle.NegativePrice.selector);
         collOracle.getPrice();
+    }
+
+    // ── Accounting split ──────────────────────────────────────────────────────
+    function test_accounting_collateral_and_liquidity_are_independent() public {
+        // Collateral deposit must NOT affect totalLiquidity
+        collToken.mint(alice, 1e18);
+        vm.startPrank(alice);
+        collToken.approve(address(lending), type(uint256).max);
+        lending.deposit(address(collToken), 1e18);
+        vm.stopPrank();
+        assertEq(lending.totalLiquidity(address(collToken)), 0, "collateral deposit must not touch totalLiquidity");
+
+        // Liquidity deposit must NOT affect totalCollateral
+        assertEq(lending.totalCollateral(address(debtToken)), 0, "lender deposit must not touch totalCollateral");
+        assertEq(lending.totalLiquidity(address(debtToken)), POOL_LIQUIDITY, "lender deposit must land in totalLiquidity");
+    }
+
+    function test_borrow_increases_totalCollateral() public {
+        uint256 collBefore = lending.totalCollateral(address(collToken));
+        collToken.mint(alice, 1e18);
+        vm.startPrank(alice);
+        collToken.approve(address(lending), type(uint256).max);
+        debtToken.approve(address(lending), type(uint256).max);
+        lending.borrow(address(collToken), 1e18, address(debtToken), 1000e18);
+        vm.stopPrank();
+        assertEq(lending.totalCollateral(address(collToken)), collBefore + 1e18);
+    }
+
+    function test_repay_decreases_totalCollateral() public {
+        collToken.mint(alice, 1e18);
+        vm.startPrank(alice);
+        collToken.approve(address(lending), type(uint256).max);
+        debtToken.approve(address(lending), type(uint256).max);
+        lending.borrow(address(collToken), 1e18, address(debtToken), 2000e18);
+
+        uint256 collBefore = lending.totalCollateral(address(collToken));
+        lending.repay(address(collToken), address(debtToken), 2000e18);
+        vm.stopPrank();
+
+        // Full repay returns all collateral → totalCollateral must drop to zero
+        assertEq(lending.totalCollateral(address(collToken)), collBefore - 1e18);
+    }
+
+    function test_liquidate_decreases_totalCollateral() public {
+        collToken.mint(alice, 1e18);
+        vm.startPrank(alice);
+        collToken.approve(address(lending), type(uint256).max);
+        debtToken.approve(address(lending), type(uint256).max);
+        lending.borrow(address(collToken), 1e18, address(debtToken), 2000e18);
+        vm.stopPrank();
+
+        collFeed.setAnswer(2400e8); // make position unhealthy
+
+        uint256 collBefore = lending.totalCollateral(address(collToken));
+        debtToken.mint(liquidator, 5000e18);
+        vm.startPrank(liquidator);
+        debtToken.approve(address(lending), type(uint256).max);
+        lending.liquidate(address(collToken), address(debtToken), alice, 1000e18);
+        vm.stopPrank();
+
+        assertLt(lending.totalCollateral(address(collToken)), collBefore, "liquidation must decrease totalCollateral");
     }
 
     // ── Fuzz: borrow amount stays within LTV ──────────────────────────────────

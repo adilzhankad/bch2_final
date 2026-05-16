@@ -41,7 +41,11 @@ contract LendingPool is ReentrancyGuard, AccessControl {
     mapping(address => AssetConfig) public assetConfig;
     // collateralToken => borrowToken => user => position
     mapping(address => mapping(address => mapping(address => UserPosition))) public positions;
-    mapping(address => uint256) public totalDeposited;
+    /// @notice Total collateral held by the pool (from deposit() and the collateral side of borrow()).
+    mapping(address => uint256) public totalCollateral;
+    /// @notice Total borrowable liquidity supplied by lenders via depositLiquidity().
+    mapping(address => uint256) public totalLiquidity;
+    /// @notice Total debt currently outstanding for each borrowable token.
     mapping(address => uint256) public totalBorrowed;
 
     event Deposited(address indexed user, address indexed token, uint256 amount);
@@ -97,7 +101,7 @@ contract LendingPool is ReentrancyGuard, AccessControl {
         if (!cfg.isCollateral) revert NotCollateral();
 
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-        totalDeposited[token] += amount;
+        totalCollateral[token] += amount;
         emit Deposited(msg.sender, token, amount);
     }
 
@@ -110,7 +114,7 @@ contract LendingPool is ReentrancyGuard, AccessControl {
         if (!cfg.isBorrowable) revert NotBorrowable();
 
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-        totalDeposited[token] += amount;
+        totalLiquidity[token] += amount;
         emit Deposited(msg.sender, token, amount);
     }
 
@@ -135,7 +139,7 @@ contract LendingPool is ReentrancyGuard, AccessControl {
         uint256 maxBorrowUSD = (colValueUSD * colCfg.ltv) / 1e18;
         uint256 borrowValueUSD = (borrowAmount * debtPrice) / 1e18;
         if (borrowValueUSD > maxBorrowUSD) revert BorrowExceedsLTV();
-        if (totalDeposited[debtToken] < totalBorrowed[debtToken] + borrowAmount) revert InsufficientLiquidity();
+        if (totalLiquidity[debtToken] < totalBorrowed[debtToken] + borrowAmount) revert InsufficientLiquidity();
 
         // CEI: update state then transfer
         IERC20(collateralToken).safeTransferFrom(msg.sender, address(this), collateralAmount);
@@ -143,6 +147,7 @@ contract LendingPool is ReentrancyGuard, AccessControl {
         _accrueInterest(pos, debtToken);
         pos.collateralAmount += collateralAmount;
         pos.debtAmount += borrowAmount;
+        totalCollateral[collateralToken] += collateralAmount;
         totalBorrowed[debtToken] += borrowAmount;
 
         IERC20(debtToken).safeTransfer(msg.sender, borrowAmount);
@@ -178,6 +183,7 @@ contract LendingPool is ReentrancyGuard, AccessControl {
             pos.collateralAmount -= collateralReturned;
         }
         if (collateralReturned > 0) {
+            totalCollateral[collateralToken] -= collateralReturned;
             IERC20(collateralToken).safeTransfer(msg.sender, collateralReturned);
         }
         emit Repaid(msg.sender, collateralToken, debtToken, repayAmount);
@@ -200,6 +206,7 @@ contract LendingPool is ReentrancyGuard, AccessControl {
             if (hf < HEALTH_FACTOR_MIN) revert HealthFactorTooLow();
         }
         pos.collateralAmount -= amount;
+        totalCollateral[collateralToken] -= amount;
         IERC20(collateralToken).safeTransfer(msg.sender, amount);
         emit Withdrawn(msg.sender, collateralToken, amount);
     }
@@ -243,6 +250,7 @@ contract LendingPool is ReentrancyGuard, AccessControl {
         pos.debtAmount -= debtToCover;
         pos.collateralAmount -= collateralSeized;
         totalBorrowed[debtToken] -= debtToCover;
+        totalCollateral[collateralToken] -= collateralSeized;
 
         IERC20(debtToken).safeTransferFrom(msg.sender, address(this), debtToCover);
         IERC20(collateralToken).safeTransfer(msg.sender, collateralSeized);
@@ -265,9 +273,9 @@ contract LendingPool is ReentrancyGuard, AccessControl {
     }
 
     function _borrowRate(address debtToken) internal view returns (uint256) {
-        uint256 deposited = totalDeposited[debtToken];
-        if (deposited == 0) return BASE_RATE;
-        uint256 utilization = (totalBorrowed[debtToken] * 1e18) / deposited;
+        uint256 liquidity = totalLiquidity[debtToken];
+        if (liquidity == 0) return BASE_RATE;
+        uint256 utilization = (totalBorrowed[debtToken] * 1e18) / liquidity;
         return BASE_RATE + (utilization * RATE_SLOPE) / 1e18;
     }
 
