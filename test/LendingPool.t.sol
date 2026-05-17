@@ -128,7 +128,9 @@ contract LendingPoolTest is Test {
     // ── depositLiquidity ──────────────────────────────────────────────────────
     function test_depositLiquidity_succeeds() public view {
         assertEq(lending.totalLiquidity(address(debtToken)), POOL_LIQUIDITY);
-        assertEq(lending.lenderBalances(address(debtToken), lender), POOL_LIQUIDITY);
+        // First deposit: shares == amount (1:1)
+        assertEq(lending.lenderShares(address(debtToken), lender), POOL_LIQUIDITY);
+        assertEq(lending.getLenderBalance(address(debtToken), lender), POOL_LIQUIDITY);
     }
 
     function test_depositLiquidity_revert_notBorrowable() public {
@@ -145,20 +147,25 @@ contract LendingPoolTest is Test {
         vm.prank(lender);
         lending.withdrawLiquidity(address(debtToken), POOL_LIQUIDITY);
         assertEq(debtToken.balanceOf(lender), lenderBefore + POOL_LIQUIDITY);
-        assertEq(lending.lenderBalances(address(debtToken), lender), 0);
+        assertEq(lending.lenderShares(address(debtToken), lender), 0);
         assertEq(lending.totalLiquidity(address(debtToken)), 0);
     }
 
     function test_withdrawLiquidity_partial() public {
         vm.prank(lender);
         lending.withdrawLiquidity(address(debtToken), POOL_LIQUIDITY / 4);
-        assertEq(lending.lenderBalances(address(debtToken), lender), POOL_LIQUIDITY * 3 / 4);
+        // Share price is 1:1 so remaining shares ≈ 3/4 of POOL_LIQUIDITY
+        assertApproxEqAbs(
+            lending.getLenderBalance(address(debtToken), lender),
+            POOL_LIQUIDITY * 3 / 4,
+            1
+        );
         assertEq(lending.totalLiquidity(address(debtToken)), POOL_LIQUIDITY * 3 / 4);
     }
 
     function test_withdrawLiquidity_revert_exceeds_lenderBalance() public {
         vm.expectRevert(LendingPool.InsufficientLiquidity.selector);
-        vm.prank(alice); // alice never deposited liquidity
+        vm.prank(alice); // alice never deposited liquidity — zero shares
         lending.withdrawLiquidity(address(debtToken), 1);
     }
 
@@ -181,6 +188,40 @@ contract LendingPoolTest is Test {
         vm.expectRevert(LendingPool.ZeroAmount.selector);
         vm.prank(lender);
         lending.withdrawLiquidity(address(debtToken), 0);
+    }
+
+    // ── Interest distribution ─────────────────────────────────────────────────
+    function test_lender_earns_interest_after_repay() public {
+        // Borrow 500 tokens at $1 each (collateral: 1 COLL @ $3000, LTV 75%)
+        collToken.mint(alice, 1e18);
+        vm.startPrank(alice);
+        collToken.approve(address(lending), type(uint256).max);
+        debtToken.approve(address(lending), type(uint256).max);
+        lending.borrow(address(collToken), 1e18, address(debtToken), 500e18);
+        vm.stopPrank();
+
+        // Warp 1 year to accumulate interest
+        vm.warp(block.timestamp + 365 days);
+
+        // Trigger accrual by a repay call (accrual is lazy)
+        // totalBorrowed / totalLiquidity = 500/1_000_000 ≈ 0.05% → rate ≈ BASE_RATE + tiny slope
+        // Interest ≈ 500 * 0.02 * 1 year = 10 tokens
+        uint256 lenderBalanceBefore = lending.getLenderBalance(address(debtToken), lender);
+
+        // Repay triggers _accrueInterest which bumps totalLiquidity
+        debtToken.mint(alice, 100e18); // extra for interest
+        vm.startPrank(alice);
+        lending.repay(address(collToken), address(debtToken), type(uint256).max);
+        vm.stopPrank();
+
+        uint256 lenderBalanceAfter = lending.getLenderBalance(address(debtToken), lender);
+
+        // Lender's balance must have increased (interest flowed into totalLiquidity)
+        assertGt(lenderBalanceAfter, lenderBalanceBefore, "Lender must earn interest after repay");
+    }
+
+    function test_getLenderBalance_no_shares_returns_zero() public view {
+        assertEq(lending.getLenderBalance(address(debtToken), alice), 0);
     }
 
     // ── Borrow ────────────────────────────────────────────────────────────────
