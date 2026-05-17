@@ -46,7 +46,9 @@ contract DeFiGovernor is
         override(Governor, GovernorSettings)
         returns (uint256)
     {
-        return token().getPastTotalSupply(clock() - 1) / 100;
+        uint48 clockNow = clock();
+        if (clockNow == 0) return 0;
+        return token().getPastTotalSupply(clockNow - 1) / 100;
     }
 
     // ─── Required overrides ───────────────────────────────────────────────────

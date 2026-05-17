@@ -1,6 +1,7 @@
 // Contract addresses — populated from env vars after L2 deployment
 export const ADDRESSES = {
   govToken:    (process.env.NEXT_PUBLIC_GOV_TOKEN    ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
+  debtToken:   (process.env.NEXT_PUBLIC_DEBT_TOKEN   ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
   ammPool:     (process.env.NEXT_PUBLIC_AMM_POOL     ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
   yieldVault:  (process.env.NEXT_PUBLIC_YIELD_VAULT  ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
   lendingPool: (process.env.NEXT_PUBLIC_LENDING_POOL ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
@@ -95,6 +96,7 @@ export const PROPOSAL_STATES = [
 
 export type ProposalState = typeof PROPOSAL_STATES[number];
 
+// For on-chain data: state is a uint8 (0–7)
 export function proposalStateBadge(state: number): { label: string; className: string } {
   const map: Record<number, { label: string; className: string }> = {
     0: { label: "Pending",   className: "bg-yellow-100 text-yellow-800" },
@@ -107,4 +109,19 @@ export function proposalStateBadge(state: number): { label: string; className: s
     7: { label: "Executed",  className: "bg-emerald-100 text-emerald-800" },
   };
   return map[state] ?? { label: "Unknown", className: "bg-gray-100 text-gray-600" };
+}
+
+// For subgraph data: state is a string ("Active", "Pending", etc.)
+export function proposalStateBadgeFromString(state: string): { label: string; className: string } {
+  const map: Record<string, { label: string; className: string }> = {
+    Pending:   { label: "Pending",   className: "bg-yellow-100 text-yellow-800" },
+    Active:    { label: "Active",    className: "bg-green-100  text-green-800"  },
+    Canceled:  { label: "Canceled",  className: "bg-gray-100   text-gray-600"   },
+    Defeated:  { label: "Defeated",  className: "bg-red-100    text-red-800"    },
+    Succeeded: { label: "Succeeded", className: "bg-blue-100   text-blue-800"   },
+    Queued:    { label: "Queued",    className: "bg-purple-100 text-purple-800" },
+    Expired:   { label: "Expired",   className: "bg-gray-100   text-gray-600"   },
+    Executed:  { label: "Executed",  className: "bg-emerald-100 text-emerald-800" },
+  };
+  return map[state] ?? { label: state, className: "bg-gray-100 text-gray-600" };
 }

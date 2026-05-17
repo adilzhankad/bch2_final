@@ -7,10 +7,10 @@ import { ADDRESSES, LENDING_POOL_ABI, ERC20_ABI } from "@/config/contracts";
 import { NetworkGuard } from "@/components/NetworkGuard";
 import { TxButton } from "@/components/TxButton";
 
-// For testnet: use govToken as both collateral and a separate deployed mock as debt token.
-// Replace these with actual token addresses after deployment.
+// Collateral = GovToken (configured as isCollateral=true in deploy script).
+// Debt token  = MockERC20 stablecoin (NEXT_PUBLIC_DEBT_TOKEN, configured as isBorrowable=true).
 const COLL_TOKEN = ADDRESSES.govToken;
-const DEBT_TOKEN = ADDRESSES.govToken; // replace with your stablecoin address
+const DEBT_TOKEN = ADDRESSES.debtToken;
 
 export default function LendingPage() {
   const { address } = useAccount();

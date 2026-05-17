@@ -41,6 +41,12 @@ contract LendingPool is ReentrancyGuard, AccessControl {
     mapping(address => AssetConfig) public assetConfig;
     // collateralToken => borrowToken => user => position
     mapping(address => mapping(address => mapping(address => UserPosition))) public positions;
+    /// @notice Per-user standalone collateral deposits (token => user => amount).
+    mapping(address => mapping(address => uint256)) public depositBalances;
+    /// @notice Per-lender pool shares (token => lender => shares). Share price rises as interest accrues.
+    mapping(address => mapping(address => uint256)) public lenderShares;
+    /// @notice Total lender shares outstanding per token.
+    mapping(address => uint256) public totalLenderShares;
     /// @notice Total collateral held by the pool (from deposit() and the collateral side of borrow()).
     mapping(address => uint256) public totalCollateral;
     /// @notice Total borrowable liquidity supplied by lenders via depositLiquidity().
@@ -101,21 +107,67 @@ contract LendingPool is ReentrancyGuard, AccessControl {
         if (!cfg.isCollateral) revert NotCollateral();
 
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        depositBalances[token][msg.sender] += amount;
         totalCollateral[token] += amount;
         emit Deposited(msg.sender, token, amount);
     }
 
+    /// @notice Withdraw standalone collateral previously deposited via deposit().
+    function withdrawDeposit(address token, uint256 amount) external nonReentrant {
+        if (amount == 0) revert ZeroAmount();
+        if (depositBalances[token][msg.sender] < amount) revert InsufficientCollateral();
+
+        depositBalances[token][msg.sender] -= amount;
+        totalCollateral[token] -= amount;
+        IERC20(token).safeTransfer(msg.sender, amount);
+        emit Withdrawn(msg.sender, token, amount);
+    }
+
     // ─── Provide liquidity (borrowable tokens) ────────────────────────────────
-    /// @notice Lenders supply borrowable tokens to earn interest
+    /// @notice Lenders supply tokens to earn interest. Shares are issued proportional to pool size
+    ///         so that as interest accrues into totalLiquidity the share price rises automatically.
     function depositLiquidity(address token, uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroAmount();
         AssetConfig storage cfg = assetConfig[token];
         if (cfg.oracle == PriceOracle(address(0))) revert AssetNotConfigured();
         if (!cfg.isBorrowable) revert NotBorrowable();
 
+        // Shares = amount * totalShares / totalLiquidity (1:1 on first deposit).
+        uint256 ts = totalLenderShares[token];
+        uint256 tl = totalLiquidity[token];
+        uint256 shares = (ts == 0 || tl == 0) ? amount : (amount * ts) / tl;
+
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        lenderShares[token][msg.sender] += shares;
+        totalLenderShares[token] += shares;
         totalLiquidity[token] += amount;
         emit Deposited(msg.sender, token, amount);
+    }
+
+    /// @notice Withdraw liquidity. Amount is calculated from the caller's share of totalLiquidity,
+    ///         which includes accrued interest — so lenders automatically earn yield.
+    function withdrawLiquidity(address token, uint256 amount) external nonReentrant {
+        if (amount == 0) revert ZeroAmount();
+        uint256 ts = totalLenderShares[token];
+        uint256 tl = totalLiquidity[token];
+        // Shares needed to redeem `amount`. Round up to protect the pool.
+        uint256 shares = (amount * ts + tl - 1) / tl;
+        if (lenderShares[token][msg.sender] < shares) revert InsufficientLiquidity();
+        uint256 available = tl - totalBorrowed[token];
+        if (available < amount) revert InsufficientLiquidity();
+
+        lenderShares[token][msg.sender] -= shares;
+        totalLenderShares[token] -= shares;
+        totalLiquidity[token] -= amount;
+        IERC20(token).safeTransfer(msg.sender, amount);
+        emit Withdrawn(msg.sender, token, amount);
+    }
+
+    /// @notice Returns the current token value of a lender's shares (principal + accrued interest).
+    function getLenderBalance(address token, address lender) external view returns (uint256) {
+        uint256 ts = totalLenderShares[token];
+        if (ts == 0) return 0;
+        return (lenderShares[token][lender] * totalLiquidity[token]) / ts;
     }
 
     // ─── Borrow ───────────────────────────────────────────────────────────────
@@ -269,6 +321,10 @@ contract LendingPool is ReentrancyGuard, AccessControl {
         uint256 rate = _borrowRate(debtToken);
         uint256 interest = (pos.debtAmount * rate * elapsed) / (1e18 * SECONDS_PER_YEAR);
         pos.debtAmount += interest;
+        // Keep global accounting consistent: outstanding debt grows with interest,
+        // and totalLiquidity grows by the same amount so lenders' share price rises.
+        totalBorrowed[debtToken] += interest;
+        totalLiquidity[debtToken] += interest;
         pos.debtAccruedAt = block.timestamp;
     }
 

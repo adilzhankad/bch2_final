@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useAccount, useReadContract, useWriteContract } from "wagmi";
+import { useAccount, useReadContract, useWriteContract, usePublicClient } from "wagmi";
 import { parseEther, formatEther, maxUint256 } from "viem";
 import { ADDRESSES, YIELD_VAULT_ABI, ERC20_ABI } from "@/config/contracts";
 import { NetworkGuard } from "@/components/NetworkGuard";
@@ -53,15 +53,17 @@ export default function VaultPage() {
   });
 
   const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
 
   const needsApprove = mode === "deposit" && (!allowance || (allowance as bigint) < parsed);
 
   const handleApprove = async () => {
     if (!assetAddr || !address) throw new Error("Not ready");
-    await writeContractAsync({
+    const hash = await writeContractAsync({
       address: assetAddr as `0x${string}`, abi: ERC20_ABI,
       functionName: "approve", args: [ADDRESSES.yieldVault, maxUint256],
     });
+    await publicClient!.waitForTransactionReceipt({ hash });
     await refetchAllowance();
   };
 

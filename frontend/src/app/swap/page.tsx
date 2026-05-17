@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useReadContract, useWriteContract, usePublicClient } from "wagmi";
 import { parseEther, formatEther, maxUint256 } from "viem";
 import { ADDRESSES, AMM_POOL_ABI, ERC20_ABI } from "@/config/contracts";
 import { NetworkGuard } from "@/components/NetworkGuard";
@@ -48,6 +48,7 @@ export default function SwapPage() {
   });
 
   const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
 
   const needsApprove = !allowance || (allowance as bigint) < parsedIn;
 
@@ -57,7 +58,7 @@ export default function SwapPage() {
       address: tokenIn, abi: ERC20_ABI, functionName: "approve",
       args: [ADDRESSES.ammPool, maxUint256],
     });
-    // Wait for approval
+    await publicClient!.waitForTransactionReceipt({ hash });
     await refetchAllowance();
   };
 

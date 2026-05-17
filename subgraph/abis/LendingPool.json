@@ -1,0 +1,68 @@
+[
+  {
+    "type": "event",
+    "name": "Deposited",
+    "anonymous": false,
+    "inputs": [
+      { "name": "user",   "type": "address", "indexed": true  },
+      { "name": "token",  "type": "address", "indexed": true  },
+      { "name": "amount", "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "Withdrawn",
+    "anonymous": false,
+    "inputs": [
+      { "name": "user",   "type": "address", "indexed": true  },
+      { "name": "token",  "type": "address", "indexed": true  },
+      { "name": "amount", "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "Borrowed",
+    "anonymous": false,
+    "inputs": [
+      { "name": "user",       "type": "address", "indexed": true  },
+      { "name": "collateral", "type": "address", "indexed": true  },
+      { "name": "debt",       "type": "address", "indexed": true  },
+      { "name": "amount",     "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "Repaid",
+    "anonymous": false,
+    "inputs": [
+      { "name": "user",       "type": "address", "indexed": true  },
+      { "name": "collateral", "type": "address", "indexed": true  },
+      { "name": "debt",       "type": "address", "indexed": true  },
+      { "name": "amount",     "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "Liquidated",
+    "anonymous": false,
+    "inputs": [
+      { "name": "liquidator",       "type": "address", "indexed": true  },
+      { "name": "user",             "type": "address", "indexed": true  },
+      { "name": "collateral",       "type": "address", "indexed": true  },
+      { "name": "debt",             "type": "address", "indexed": false },
+      { "name": "debtRepaid",       "type": "uint256", "indexed": false },
+      { "name": "collateralSeized", "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "AssetConfigured",
+    "anonymous": false,
+    "inputs": [
+      { "name": "token",        "type": "address", "indexed": true  },
+      { "name": "ltv",          "type": "uint256", "indexed": false },
+      { "name": "isCollateral", "type": "bool",    "indexed": false },
+      { "name": "isBorrowable", "type": "bool",    "indexed": false }
+    ]
+  }
+]

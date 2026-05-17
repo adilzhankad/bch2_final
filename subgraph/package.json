@@ -1,0 +1,17 @@
+{
+  "name": "defi-dapp-subgraph",
+  "version": "1.0.0",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy:goldsky": "goldsky subgraph deploy defi-dapp/1.0.1 --path .",
+    "deploy:studio": "graph deploy --studio defi-dapp",
+    "auth:studio": "graph auth --studio"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-ts": "^0.35.1"
+  },
+  "devDependencies": {
+    "@graphprotocol/graph-cli": "^0.80.0"
+  }
+}

@@ -1,16 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAccount, useReadContract, useWriteContract, useBlockNumber } from "wagmi";
+import { useAccount, useReadContract, useWriteContract } from "wagmi";
 import { formatEther } from "viem";
-import { ADDRESSES, GOV_TOKEN_ABI, GOVERNOR_ABI, proposalStateBadge } from "@/config/contracts";
+import { ADDRESSES, GOV_TOKEN_ABI, GOVERNOR_ABI, proposalStateBadge, proposalStateBadgeFromString } from "@/config/contracts";
 import { NetworkGuard } from "@/components/NetworkGuard";
 import { TxButton } from "@/components/TxButton";
 import { fetchProposals, subgraphConfigured, type SubgraphProposal } from "@/lib/subgraph";
 
 export default function GovernancePage() {
   const { address } = useAccount();
-  const { data: blockNumber } = useBlockNumber();
 
   // Gov token state
   const { data: govBalance } = useReadContract({
@@ -151,7 +150,7 @@ function ProposalCard({
   writeContractAsync: ReturnType<typeof useWriteContract>["writeContractAsync"];
 }) {
   const proposalId = BigInt(proposal.proposalId);
-  const badge = proposalStateBadge(parseInt(proposal.state));
+  const badge = proposalStateBadgeFromString(proposal.state);
 
   const { data: hasVoted, refetch } = useReadContract({
     address: ADDRESSES.governor, abi: GOVERNOR_ABI, functionName: "hasVoted",
@@ -168,7 +167,7 @@ function ProposalCard({
     await refetch();
   };
 
-  const isActive = proposal.state === "1";
+  const isActive = proposal.state === "Active";
 
   const forVotes     = Number(formatEther(BigInt(proposal.forVotes))).toFixed(0);
   const againstVotes = Number(formatEther(BigInt(proposal.againstVotes))).toFixed(0);
