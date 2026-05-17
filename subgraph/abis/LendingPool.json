@@ -2,6 +2,7 @@
   {
     "type": "event",
     "name": "Deposited",
+    "anonymous": false,
     "inputs": [
       { "name": "user",   "type": "address", "indexed": true  },
       { "name": "token",  "type": "address", "indexed": true  },
@@ -11,6 +12,7 @@
   {
     "type": "event",
     "name": "Withdrawn",
+    "anonymous": false,
     "inputs": [
       { "name": "user",   "type": "address", "indexed": true  },
       { "name": "token",  "type": "address", "indexed": true  },
@@ -20,6 +22,7 @@
   {
     "type": "event",
     "name": "Borrowed",
+    "anonymous": false,
     "inputs": [
       { "name": "user",       "type": "address", "indexed": true  },
       { "name": "collateral", "type": "address", "indexed": true  },
@@ -30,6 +33,7 @@
   {
     "type": "event",
     "name": "Repaid",
+    "anonymous": false,
     "inputs": [
       { "name": "user",       "type": "address", "indexed": true  },
       { "name": "collateral", "type": "address", "indexed": true  },
@@ -40,6 +44,7 @@
   {
     "type": "event",
     "name": "Liquidated",
+    "anonymous": false,
     "inputs": [
       { "name": "liquidator",       "type": "address", "indexed": true  },
       { "name": "user",             "type": "address", "indexed": true  },
@@ -52,6 +57,7 @@
   {
     "type": "event",
     "name": "AssetConfigured",
+    "anonymous": false,
     "inputs": [
       { "name": "token",        "type": "address", "indexed": true  },
       { "name": "ltv",          "type": "uint256", "indexed": false },

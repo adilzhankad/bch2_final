@@ -2,6 +2,7 @@
   {
     "type": "event",
     "name": "Deposit",
+    "anonymous": false,
     "inputs": [
       { "name": "sender", "type": "address", "indexed": true  },
       { "name": "owner",  "type": "address", "indexed": true  },
@@ -12,6 +13,7 @@
   {
     "type": "event",
     "name": "Withdraw",
+    "anonymous": false,
     "inputs": [
       { "name": "sender",   "type": "address", "indexed": true  },
       { "name": "receiver", "type": "address", "indexed": true  },
@@ -23,6 +25,7 @@
   {
     "type": "event",
     "name": "YieldInjected",
+    "anonymous": false,
     "inputs": [
       { "name": "by",     "type": "address", "indexed": true  },
       { "name": "amount", "type": "uint256", "indexed": false }

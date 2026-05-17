@@ -4,18 +4,15 @@ repository: https://github.com/your-org/bch2-final
 schema:
   file: ./schema.graphql
 
-# ─── Replace every address below with the actual deployed address ─────────────
-# after running: forge script script/Deploy.s.sol --broadcast --rpc-url optimism_sepolia
-
 dataSources:
   # ── PoolFactory ─────────────────────────────────────────────────────────────
   - kind: ethereum
     name: PoolFactory
     network: optimism-sepolia
     source:
-      address: "0x0000000000000000000000000000000000000000"
+      address: "0x854B46B5DD326308bE89CA0f87aF7aece562E690"
       abi: PoolFactory
-      startBlock: 0
+      startBlock: 43613437
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -36,9 +33,9 @@ dataSources:
     name: LendingPool
     network: optimism-sepolia
     source:
-      address: "0x0000000000000000000000000000000000000000"
+      address: "0x8a7968Af678dc57F900Fee73944Ce175019f7141"
       abi: LendingPool
-      startBlock: 0
+      startBlock: 43613437
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -71,9 +68,9 @@ dataSources:
     name: YieldVault
     network: optimism-sepolia
     source:
-      address: "0x0000000000000000000000000000000000000000"
+      address: "0xc3918E6Dad6E59C5d33A31948CCfC13563bf0428"
       abi: YieldVault
-      startBlock: 0
+      startBlock: 43613437
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -100,9 +97,9 @@ dataSources:
     name: DeFiGovernor
     network: optimism-sepolia
     source:
-      address: "0x0000000000000000000000000000000000000000"
+      address: "0xcc26c270bCB0989a9Eb1d4Fe4D26caE3C2073eca"
       abi: DeFiGovernor
-      startBlock: 0
+      startBlock: 43613437
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -131,9 +128,9 @@ dataSources:
     name: ProtocolNFT
     network: optimism-sepolia
     source:
-      address: "0x0000000000000000000000000000000000000000"
+      address: "0x6E84187542a1310f6dE482A4f8569F00eF6AbC62"
       abi: ProtocolNFT
-      startBlock: 0
+      startBlock: 43613437
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7

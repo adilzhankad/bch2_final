@@ -2,6 +2,7 @@
   {
     "type": "event",
     "name": "Minted",
+    "anonymous": false,
     "inputs": [
       { "name": "to",      "type": "address", "indexed": true  },
       { "name": "tokenId", "type": "uint256", "indexed": true  },

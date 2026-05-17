@@ -2,6 +2,7 @@
   {
     "type": "event",
     "name": "PoolCreated",
+    "anonymous": false,
     "inputs": [
       { "name": "token0",     "type": "address", "indexed": true  },
       { "name": "token1",     "type": "address", "indexed": true  },

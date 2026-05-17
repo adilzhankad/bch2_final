@@ -4,7 +4,7 @@
   "scripts": {
     "codegen": "graph codegen",
     "build": "graph build",
-    "deploy:alchemy": "graph deploy defi-dapp --node https://subgraphs.alchemy.com/api/$ALCHEMY_DEPLOY_KEY/deploy --ipfs https://ipfs.svc.alchemy.com",
+    "deploy:goldsky": "goldsky subgraph deploy defi-dapp/1.0.1 --path .",
     "deploy:studio": "graph deploy --studio defi-dapp",
     "auth:studio": "graph auth --studio"
   },

@@ -1,6 +1,5 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   webpack: (config) => {
     // Required for WalletConnect / RainbowKit
     config.externals.push("pino-pretty", "lokijs", "encoding");
