@@ -69,6 +69,46 @@ contract LendingPoolTest is Test {
         lending.deposit(address(collToken), 100e18);
         vm.stopPrank();
         assertEq(lending.totalCollateral(address(collToken)), 100e18);
+        assertEq(lending.depositBalances(address(collToken), alice), 100e18);
+    }
+
+    function test_withdrawDeposit_full() public {
+        collToken.mint(alice, 100e18);
+        vm.startPrank(alice);
+        collToken.approve(address(lending), type(uint256).max);
+        lending.deposit(address(collToken), 100e18);
+        lending.withdrawDeposit(address(collToken), 100e18);
+        vm.stopPrank();
+        assertEq(collToken.balanceOf(alice), 100e18);
+        assertEq(lending.depositBalances(address(collToken), alice), 0);
+        assertEq(lending.totalCollateral(address(collToken)), 0);
+    }
+
+    function test_withdrawDeposit_partial() public {
+        collToken.mint(alice, 100e18);
+        vm.startPrank(alice);
+        collToken.approve(address(lending), type(uint256).max);
+        lending.deposit(address(collToken), 100e18);
+        lending.withdrawDeposit(address(collToken), 40e18);
+        vm.stopPrank();
+        assertEq(collToken.balanceOf(alice), 40e18);
+        assertEq(lending.depositBalances(address(collToken), alice), 60e18);
+        assertEq(lending.totalCollateral(address(collToken)), 60e18);
+    }
+
+    function test_withdrawDeposit_revert_insufficient() public {
+        collToken.mint(alice, 50e18);
+        vm.startPrank(alice);
+        collToken.approve(address(lending), type(uint256).max);
+        lending.deposit(address(collToken), 50e18);
+        vm.expectRevert(LendingPool.InsufficientCollateral.selector);
+        lending.withdrawDeposit(address(collToken), 51e18);
+        vm.stopPrank();
+    }
+
+    function test_withdrawDeposit_revert_zero() public {
+        vm.expectRevert(LendingPool.ZeroAmount.selector);
+        lending.withdrawDeposit(address(collToken), 0);
     }
 
     function test_deposit_revert_zeroAmount() public {
@@ -88,6 +128,7 @@ contract LendingPoolTest is Test {
     // ── depositLiquidity ──────────────────────────────────────────────────────
     function test_depositLiquidity_succeeds() public view {
         assertEq(lending.totalLiquidity(address(debtToken)), POOL_LIQUIDITY);
+        assertEq(lending.lenderBalances(address(debtToken), lender), POOL_LIQUIDITY);
     }
 
     function test_depositLiquidity_revert_notBorrowable() public {
@@ -97,6 +138,49 @@ contract LendingPoolTest is Test {
         vm.expectRevert(LendingPool.NotBorrowable.selector);
         lending.depositLiquidity(address(collToken), 1e18);
         vm.stopPrank();
+    }
+
+    function test_withdrawLiquidity_full() public {
+        uint256 lenderBefore = debtToken.balanceOf(lender);
+        vm.prank(lender);
+        lending.withdrawLiquidity(address(debtToken), POOL_LIQUIDITY);
+        assertEq(debtToken.balanceOf(lender), lenderBefore + POOL_LIQUIDITY);
+        assertEq(lending.lenderBalances(address(debtToken), lender), 0);
+        assertEq(lending.totalLiquidity(address(debtToken)), 0);
+    }
+
+    function test_withdrawLiquidity_partial() public {
+        vm.prank(lender);
+        lending.withdrawLiquidity(address(debtToken), POOL_LIQUIDITY / 4);
+        assertEq(lending.lenderBalances(address(debtToken), lender), POOL_LIQUIDITY * 3 / 4);
+        assertEq(lending.totalLiquidity(address(debtToken)), POOL_LIQUIDITY * 3 / 4);
+    }
+
+    function test_withdrawLiquidity_revert_exceeds_lenderBalance() public {
+        vm.expectRevert(LendingPool.InsufficientLiquidity.selector);
+        vm.prank(alice); // alice never deposited liquidity
+        lending.withdrawLiquidity(address(debtToken), 1);
+    }
+
+    function test_withdrawLiquidity_revert_insufficient_available() public {
+        // Borrow almost all liquidity so available < lender's balance
+        collToken.mint(alice, 1000e18);
+        vm.startPrank(alice);
+        collToken.approve(address(lending), type(uint256).max);
+        debtToken.approve(address(lending), type(uint256).max);
+        lending.borrow(address(collToken), 1000e18, address(debtToken), POOL_LIQUIDITY - 1e18);
+        vm.stopPrank();
+
+        // lender tries to withdraw more than what's available (only 1e18 left)
+        vm.prank(lender);
+        vm.expectRevert(LendingPool.InsufficientLiquidity.selector);
+        lending.withdrawLiquidity(address(debtToken), 2e18);
+    }
+
+    function test_withdrawLiquidity_revert_zero() public {
+        vm.expectRevert(LendingPool.ZeroAmount.selector);
+        vm.prank(lender);
+        lending.withdrawLiquidity(address(debtToken), 0);
     }
 
     // ── Borrow ────────────────────────────────────────────────────────────────

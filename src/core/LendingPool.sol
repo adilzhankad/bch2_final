@@ -41,6 +41,10 @@ contract LendingPool is ReentrancyGuard, AccessControl {
     mapping(address => AssetConfig) public assetConfig;
     // collateralToken => borrowToken => user => position
     mapping(address => mapping(address => mapping(address => UserPosition))) public positions;
+    /// @notice Per-user standalone collateral deposits (token => user => amount).
+    mapping(address => mapping(address => uint256)) public depositBalances;
+    /// @notice Per-lender liquidity balances (token => lender => amount).
+    mapping(address => mapping(address => uint256)) public lenderBalances;
     /// @notice Total collateral held by the pool (from deposit() and the collateral side of borrow()).
     mapping(address => uint256) public totalCollateral;
     /// @notice Total borrowable liquidity supplied by lenders via depositLiquidity().
@@ -101,8 +105,20 @@ contract LendingPool is ReentrancyGuard, AccessControl {
         if (!cfg.isCollateral) revert NotCollateral();
 
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        depositBalances[token][msg.sender] += amount;
         totalCollateral[token] += amount;
         emit Deposited(msg.sender, token, amount);
+    }
+
+    /// @notice Withdraw standalone collateral previously deposited via deposit().
+    function withdrawDeposit(address token, uint256 amount) external nonReentrant {
+        if (amount == 0) revert ZeroAmount();
+        if (depositBalances[token][msg.sender] < amount) revert InsufficientCollateral();
+
+        depositBalances[token][msg.sender] -= amount;
+        totalCollateral[token] -= amount;
+        IERC20(token).safeTransfer(msg.sender, amount);
+        emit Withdrawn(msg.sender, token, amount);
     }
 
     // ─── Provide liquidity (borrowable tokens) ────────────────────────────────
@@ -114,8 +130,23 @@ contract LendingPool is ReentrancyGuard, AccessControl {
         if (!cfg.isBorrowable) revert NotBorrowable();
 
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        lenderBalances[token][msg.sender] += amount;
         totalLiquidity[token] += amount;
         emit Deposited(msg.sender, token, amount);
+    }
+
+    /// @notice Withdraw liquidity previously supplied via depositLiquidity().
+    /// @dev Reverts if the requested amount exceeds currently available (not borrowed) liquidity.
+    function withdrawLiquidity(address token, uint256 amount) external nonReentrant {
+        if (amount == 0) revert ZeroAmount();
+        if (lenderBalances[token][msg.sender] < amount) revert InsufficientLiquidity();
+        uint256 available = totalLiquidity[token] - totalBorrowed[token];
+        if (available < amount) revert InsufficientLiquidity();
+
+        lenderBalances[token][msg.sender] -= amount;
+        totalLiquidity[token] -= amount;
+        IERC20(token).safeTransfer(msg.sender, amount);
+        emit Withdrawn(msg.sender, token, amount);
     }
 
     // ─── Borrow ───────────────────────────────────────────────────────────────
