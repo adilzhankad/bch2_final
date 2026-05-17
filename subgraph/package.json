@@ -1,0 +1,17 @@
+{
+  "name": "defi-dapp-subgraph",
+  "version": "1.0.0",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy:alchemy": "graph deploy defi-dapp --node https://subgraphs.alchemy.com/api/$ALCHEMY_DEPLOY_KEY/deploy --ipfs https://ipfs.svc.alchemy.com",
+    "deploy:studio": "graph deploy --studio defi-dapp",
+    "auth:studio": "graph auth --studio"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-ts": "^0.35.1"
+  },
+  "devDependencies": {
+    "@graphprotocol/graph-cli": "^0.80.0"
+  }
+}

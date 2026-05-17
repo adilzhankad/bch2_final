@@ -1,0 +1,13 @@
+[
+  {
+    "type": "event",
+    "name": "PoolCreated",
+    "inputs": [
+      { "name": "token0",     "type": "address", "indexed": true  },
+      { "name": "token1",     "type": "address", "indexed": true  },
+      { "name": "pool",       "type": "address", "indexed": false },
+      { "name": "poolIndex",  "type": "uint256", "indexed": false },
+      { "name": "viaCREATE2", "type": "bool",    "indexed": false }
+    ]
+  }
+]

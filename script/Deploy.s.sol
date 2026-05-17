@@ -13,6 +13,7 @@ import "../src/core/LendingPool.sol";
 import "../src/core/YieldVault.sol";
 import "../src/core/PriceOracle.sol";
 import "../src/core/MockAggregatorV3.sol";
+import "../src/core/MockERC20.sol";
 import "../src/governance/DeFiGovernor.sol";
 import "../src/governance/Treasury.sol";
 
@@ -33,6 +34,7 @@ contract Deploy is Script {
     address public vaultProxy;
     address public ethOracleAddr;
     address public treasuryAddr;
+    address public mockStablecoinAddr;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -103,10 +105,25 @@ contract Deploy is Script {
         factoryAddr = address(new PoolFactory());
         console.log("PoolFactory:     ", factoryAddr);
 
+        // Deploy mock stablecoin used as borrowable debt token in the lending pool.
+        // On mainnet, replace with a real stablecoin (USDC, DAI, etc.).
+        MockERC20 mockUsdc = new MockERC20("Mock USDC", "mUSDC", 18, deployer);
+        mockUsdc.mint(deployer, 10_000_000e18);
+        mockStablecoinAddr = address(mockUsdc);
+        console.log("MockERC20 (mUSDC):", mockStablecoinAddr);
+
         lendingAddr = address(new LendingPool(deployer));
+        // govToken  → collateral only  (LTV 75%, liq threshold 80%)
         LendingPool(lendingAddr).configureAsset(
             govProxy, ethOracleAddr, 0.75e18, 0.80e18, 0.05e18, true, false
         );
+        // mUSDC     → borrowable debt token (LTV 90%, liq threshold 95%, 1% bonus)
+        LendingPool(lendingAddr).configureAsset(
+            mockStablecoinAddr, usdcOracleAddr, 0.90e18, 0.95e18, 0.01e18, false, true
+        );
+        // Seed the lending pool with liquidity so borrows are possible
+        mockUsdc.approve(lendingAddr, 1_000_000e18);
+        LendingPool(lendingAddr).depositLiquidity(mockStablecoinAddr, 1_000_000e18);
         console.log("LendingPool:     ", lendingAddr);
 
         YieldVaultV1 vaultImpl = new YieldVaultV1();
@@ -159,6 +176,9 @@ contract Deploy is Script {
         vault.revokeRole(vault.PAUSER_ROLE(),         deployer);
         vault.revokeRole(vault.DEFAULT_ADMIN_ROLE(),  deployer);
 
+        // ── MockERC20 stablecoin (Ownable) ────────────────────────────────────
+        MockERC20(mockStablecoinAddr).transferOwnership(timelockAddr);
+
         // ── PoolFactory (Ownable) ─────────────────────────────────────────────
         PoolFactory(factoryAddr).transferOwnership(timelockAddr);
 
@@ -180,6 +200,7 @@ contract Deploy is Script {
         console.log("DeFiGovernor:    ", governorAddr);
         console.log("PoolFactory:     ", factoryAddr);
         console.log("LendingPool:     ", lendingAddr);
+        console.log("MockERC20 mUSDC: ", mockStablecoinAddr);
         console.log("YieldVault:      ", vaultProxy);
         console.log("Treasury:        ", treasuryAddr);
         console.log("ETH Oracle:      ", ethOracleAddr);

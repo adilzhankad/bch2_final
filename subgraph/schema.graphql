@@ -1,0 +1,175 @@
+# ─── AMM ─────────────────────────────────────────────────────────────────────
+
+type Pool @entity {
+  id: ID!              # pool contract address (hex)
+  token0: Bytes!
+  token1: Bytes!
+  reserve0: BigInt!
+  reserve1: BigInt!
+  swapCount: BigInt!
+  createdAt: BigInt!
+  swaps: [Swap!]! @derivedFrom(field: "pool")
+  liquidityEvents: [LiquidityEvent!]! @derivedFrom(field: "pool")
+}
+
+type Swap @entity {
+  id: ID!              # txHash-logIndex
+  pool: Pool!
+  sender: Bytes!
+  amount0In: BigInt!
+  amount1In: BigInt!
+  amount0Out: BigInt!
+  amount1Out: BigInt!
+  amountIn: BigInt!    # non-zero side in (for frontend convenience)
+  amountOut: BigInt!   # non-zero side out
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}
+
+type LiquidityEvent @entity {
+  id: ID!
+  pool: Pool!
+  type: String!        # "MINT" | "BURN"
+  sender: Bytes!
+  amount0: BigInt!
+  amount1: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}
+
+# ─── Lending ──────────────────────────────────────────────────────────────────
+
+type LendingDeposit @entity {
+  id: ID!
+  user: Bytes!
+  token: Bytes!
+  amount: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}
+
+type LendingWithdrawal @entity {
+  id: ID!
+  user: Bytes!
+  token: Bytes!
+  amount: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}
+
+type Borrow @entity {
+  id: ID!
+  user: Bytes!
+  collateral: Bytes!
+  debt: Bytes!
+  amount: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}
+
+type Repay @entity {
+  id: ID!
+  user: Bytes!
+  collateral: Bytes!
+  debt: Bytes!
+  amount: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}
+
+type Liquidation @entity {
+  id: ID!
+  liquidator: Bytes!
+  user: Bytes!
+  collateral: Bytes!
+  debt: Bytes!
+  debtRepaid: BigInt!
+  collateralSeized: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}
+
+# ─── Yield Vault ──────────────────────────────────────────────────────────────
+
+# Entity name "Deposit" matches the frontend's `deposits` GraphQL query.
+type Deposit @entity {
+  id: ID!
+  caller: Bytes!       # ERC-4626 event.sender
+  owner: Bytes!
+  assets: BigInt!
+  shares: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}
+
+type VaultWithdrawal @entity {
+  id: ID!
+  sender: Bytes!
+  receiver: Bytes!
+  owner: Bytes!
+  assets: BigInt!
+  shares: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}
+
+type YieldInjection @entity {
+  id: ID!
+  by: Bytes!
+  amount: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}
+
+# ─── Governance ───────────────────────────────────────────────────────────────
+
+# State values: Pending | Active | Canceled | Queued | Executed | Defeated
+# Transitions: Created→Pending; first VoteCast→Active; ProposalQueued→Queued;
+#              ProposalExecuted→Executed; ProposalCanceled→Canceled.
+type Proposal @entity {
+  id: ID!              # proposalId as decimal string
+  proposalId: BigInt!
+  proposer: Bytes!
+  description: String!
+  voteStart: BigInt!
+  voteEnd: BigInt!
+  forVotes: BigInt!
+  againstVotes: BigInt!
+  abstainVotes: BigInt!
+  state: String!
+  eta: BigInt          # set when Queued
+  votes: [Vote!]! @derivedFrom(field: "proposal")
+}
+
+type Vote @entity {
+  id: ID!              # txHash-logIndex
+  proposal: Proposal!
+  voter: Bytes!
+  support: Int!        # 0=Against 1=For 2=Abstain
+  weight: BigInt!
+  reason: String!
+  timestamp: BigInt!
+}
+
+# ─── NFT ──────────────────────────────────────────────────────────────────────
+
+type NFTMint @entity {
+  id: ID!
+  to: Bytes!
+  tokenId: BigInt!
+  uri: String!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}
+
+# ─── Protocol-wide aggregates ─────────────────────────────────────────────────
+
+type ProtocolStats @entity {
+  id: ID!                   # always "global"
+  totalSwaps: BigInt!
+  totalVolumeUSD: BigInt!   # running wei-denominated volume (no price feed on testnet)
+  totalVaultDeposits: BigInt!
+  totalVaultTVL: BigInt!    # assets deposited minus withdrawn plus injected yield
+  totalPools: BigInt!
+  totalBorrows: BigInt!
+}

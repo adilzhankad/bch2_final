@@ -118,8 +118,8 @@ forge build
 # Test
 forge test -vv
 
-# Coverage
-forge coverage --report summary
+# Coverage (report saved to coverage/coverage-report.md)
+forge coverage --report summary | tee coverage/coverage-report.md
 
 # Deploy to Optimism Sepolia
 cp .env.example .env   # fill PRIVATE_KEY, OPTIMISM_SEPOLIA_RPC_URL
@@ -128,7 +128,40 @@ forge script script/Deploy.s.sol --rpc-url optimism_sepolia --broadcast --verify
 
 ---
 
-## Environment Variables
+## Frontend Setup
+
+```bash
+cd frontend
+
+# 1. Copy env template and fill in values
+cp .env.local.example .env.local
+
+# 2. Install dependencies
+npm install
+
+# 3. Start dev server
+npm run dev
+```
+
+### Frontend Environment Variables
+
+Edit `frontend/.env.local` after copying from `.env.local.example`:
+
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | Free key from [cloud.walletconnect.com](https://cloud.walletconnect.com) |
+| `NEXT_PUBLIC_GOV_TOKEN` | Deployed GovToken proxy address (Optimism Sepolia) |
+| `NEXT_PUBLIC_AMM_POOL` | Deployed AMMPool address |
+| `NEXT_PUBLIC_YIELD_VAULT` | Deployed YieldVault proxy address |
+| `NEXT_PUBLIC_LENDING_POOL` | Deployed LendingPool address |
+| `NEXT_PUBLIC_GOVERNOR` | Deployed DeFiGovernor address |
+| `NEXT_PUBLIC_TIMELOCK` | Deployed TimelockController address |
+| `NEXT_PUBLIC_TREASURY` | Deployed Treasury address |
+| `NEXT_PUBLIC_SUBGRAPH_URL` | The Graph studio endpoint (after subgraph deployment) |
+
+---
+
+## Environment Variables (Contracts / CI)
 
 ```
 PRIVATE_KEY=0x...

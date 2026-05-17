@@ -1,0 +1,11 @@
+[
+  {
+    "type": "event",
+    "name": "Minted",
+    "inputs": [
+      { "name": "to",      "type": "address", "indexed": true  },
+      { "name": "tokenId", "type": "uint256", "indexed": true  },
+      { "name": "uri",     "type": "string",  "indexed": false }
+    ]
+  }
+]

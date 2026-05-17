@@ -14,6 +14,7 @@ contract PoolFactory is Ownable {
     error PoolExists();
     error IdenticalTokens();
     error ZeroAddress();
+    error Create2Failed();
 
     constructor() Ownable(msg.sender) {}
 
@@ -36,7 +37,7 @@ contract PoolFactory is Ownable {
         assembly {
             pool := create2(0, add(bytecode, 0x20), mload(bytecode), salt)
         }
-        require(pool != address(0), "PoolFactory: CREATE2 failed");
+        if (pool == address(0)) revert Create2Failed();
         _register(token0, token1, pool, true);
     }
 

@@ -1,0 +1,62 @@
+[
+  {
+    "type": "event",
+    "name": "Deposited",
+    "inputs": [
+      { "name": "user",   "type": "address", "indexed": true  },
+      { "name": "token",  "type": "address", "indexed": true  },
+      { "name": "amount", "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "Withdrawn",
+    "inputs": [
+      { "name": "user",   "type": "address", "indexed": true  },
+      { "name": "token",  "type": "address", "indexed": true  },
+      { "name": "amount", "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "Borrowed",
+    "inputs": [
+      { "name": "user",       "type": "address", "indexed": true  },
+      { "name": "collateral", "type": "address", "indexed": true  },
+      { "name": "debt",       "type": "address", "indexed": true  },
+      { "name": "amount",     "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "Repaid",
+    "inputs": [
+      { "name": "user",       "type": "address", "indexed": true  },
+      { "name": "collateral", "type": "address", "indexed": true  },
+      { "name": "debt",       "type": "address", "indexed": true  },
+      { "name": "amount",     "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "Liquidated",
+    "inputs": [
+      { "name": "liquidator",       "type": "address", "indexed": true  },
+      { "name": "user",             "type": "address", "indexed": true  },
+      { "name": "collateral",       "type": "address", "indexed": true  },
+      { "name": "debt",             "type": "address", "indexed": false },
+      { "name": "debtRepaid",       "type": "uint256", "indexed": false },
+      { "name": "collateralSeized", "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "AssetConfigured",
+    "inputs": [
+      { "name": "token",        "type": "address", "indexed": true  },
+      { "name": "ltv",          "type": "uint256", "indexed": false },
+      { "name": "isCollateral", "type": "bool",    "indexed": false },
+      { "name": "isBorrowable", "type": "bool",    "indexed": false }
+    ]
+  }
+]

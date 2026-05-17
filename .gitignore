@@ -1,8 +1,29 @@
+# ─── Foundry ──────────────────────────────────────────────────────────────────
 out/
 cache/
 broadcast/
+foundry.lock
+
+# ─── Environment / secrets ────────────────────────────────────────────────────
 .env
 .env.local
+.env.*.local
+
+# ─── Frontend ─────────────────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+
+# ─── Subgraph ─────────────────────────────────────────────────────────────────
+subgraph/node_modules/
+subgraph/generated/
+subgraph/build/
+
+# ─── Editor / OS ──────────────────────────────────────────────────────────────
 *.swp
 *.swo
-foundry.lock
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
