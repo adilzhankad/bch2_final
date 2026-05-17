@@ -90,8 +90,8 @@ contract GovTokenTest is Test {
         token.mint(alice, 200e18);
         vm.prank(alice);
         token.delegate(alice);
-        uint256 snapshot = block.number;
-        vm.roll(block.number + 1);
+        uint256 snapshot = block.timestamp;
+        vm.warp(block.timestamp + 1);
         assertEq(token.getPastVotes(alice, snapshot), 200e18);
     }
 
@@ -147,7 +147,8 @@ contract GovTokenTest is Test {
     }
 
     function test_clock() public view {
-        assertEq(token.clock(), uint48(block.number));
+        assertEq(token.clock(), uint48(block.timestamp));
+        assertEq(token.CLOCK_MODE(), "mode=timestamp");
     }
 
     // ── Fuzz: delegated voting power always equals delegator's balance ────────
