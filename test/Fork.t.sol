@@ -23,7 +23,7 @@ contract ForkTest is Test {
 
     function setUp() public {
         string memory rpcUrl = vm.envOr("MAINNET_RPC_URL", string(""));
-        if (bytes(rpcUrl).length == 0) return; // no RPC → skip all fork tests
+        if (bytes(rpcUrl).length == 0) return;
 
         vm.createSelectFork(rpcUrl, FORK_BLOCK);
         forkActive = true;
@@ -33,7 +33,7 @@ contract ForkTest is Test {
     // Fork test 1 — Chainlink ETH/USD feed returns a positive, in-range price
     // ─────────────────────────────────────────────────────────────────────────
     function test_fork_chainlink_ethUsd_price() public {
-        if (!forkActive) return;
+        if (!forkActive) { vm.skip(true); return; }
 
         // Raw feed call (no staleness guard) so we see the real round data.
         PriceOracle oracle = new PriceOracle(CHAINLINK_ETH_USD, 24 hours);
@@ -49,7 +49,7 @@ contract ForkTest is Test {
     //               to 18 decimals and the staleness check honours the timestamp
     // ─────────────────────────────────────────────────────────────────────────
     function test_fork_oracle_normalises_to_18_decimals() public {
-        if (!forkActive) return;
+        if (!forkActive) { vm.skip(true); return; }
 
         // Chainlink feeds deliver 8 decimals; our oracle must scale to 18.
         PriceOracle oracle = new PriceOracle(CHAINLINK_ETH_USD, 24 hours);
@@ -68,7 +68,7 @@ contract ForkTest is Test {
     // Fork test 3 — USDC is a valid ERC-20 with 6 decimals and positive supply
     // ─────────────────────────────────────────────────────────────────────────
     function test_fork_usdc_erc20_properties() public {
-        if (!forkActive) return;
+        if (!forkActive) { vm.skip(true); return; }
 
         IERC20 usdc = IERC20(USDC);
 
@@ -91,7 +91,7 @@ contract ForkTest is Test {
     // Fork test 4 — Staleness guard reverts when we warp past the threshold
     // ─────────────────────────────────────────────────────────────────────────
     function test_fork_oracle_reverts_on_stale_price() public {
-        if (!forkActive) return;
+        if (!forkActive) { vm.skip(true); return; }
 
         // Deploy oracle with a 1-hour staleness window.
         PriceOracle oracle = new PriceOracle(CHAINLINK_ETH_USD, 1 hours);

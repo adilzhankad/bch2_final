@@ -149,10 +149,12 @@ contract YieldVaultV2 is YieldVaultV1 {
     function injectYieldWithFee(uint256 amount) external onlyRole(YIELD_MANAGER_ROLE) {
         uint256 fee = (amount * performanceFee) / 10_000;
         uint256 net = amount - fee;
-        SafeERC20.safeTransferFrom(IERC20(asset()), msg.sender, address(this), amount);
+        IERC20 underlying = IERC20(asset());
+        // Route fee directly from caller to recipient; only net enters the vault.
         if (fee > 0 && feeRecipient != address(0)) {
-            SafeERC20.safeTransfer(IERC20(asset()), feeRecipient, fee);
+            SafeERC20.safeTransferFrom(underlying, msg.sender, feeRecipient, fee);
         }
+        SafeERC20.safeTransferFrom(underlying, msg.sender, address(this), net);
         emit YieldInjected(msg.sender, net);
     }
 
