@@ -90,7 +90,7 @@ function _sqrt(uint256 x) internal pure returns (uint256 y) {
 
 ## Test Suite
 
-**132 tests passing** (4 fork tests skipped without a mainnet RPC key).
+**136 tests passing** (4 fork tests skipped without a mainnet RPC key).
 
 ```
 test/
@@ -101,8 +101,9 @@ test/
 ├── YieldVault.t.sol     — 12 (unit + 2 fuzz)
 ├── ProtocolNFT.t.sol    — 15 (unit + 1 fuzz)
 ├── Security.t.sol       —  7 (reentrancy + access-control case studies)
-├── Invariants.t.sol     — 10 (k, LP supply, reserves, totalSupply, maxSupply,
-│                              ERC-4626 round-trips, vault totalAssets)
+├── Invariants.t.sol     — 13 (k, LP supply, reserves, totalSupply, maxSupply,
+│                              ERC-4626 round-trips, vault totalAssets,
+│                              treasury ETH/ERC20 accounting + sink-only flow)
 ├── YulBenchmark.t.sol   —  6 (Yul sqrt vs Solidity, fuzz + gas)
 ├── DeployVerify.t.sol   —  1 (post-deployment spec verification)
 └── Fork.t.sol           —  4 (Chainlink ETH/USD, USDC ERC-20 on mainnet)
@@ -111,7 +112,7 @@ test/
 Breakdown vs. spec minimums:
 - Unit: 100+ (≥50 required)
 - Fuzz: 13 (≥10 required)
-- Invariant: 10 (≥5 required)
+- Invariant: 13 (≥5 required, incl. mandatory **treasury accounting**)
 - Fork: 4 (≥3 required)
 
 ---
