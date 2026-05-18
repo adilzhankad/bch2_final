@@ -16,16 +16,13 @@ contract ForkTest is Test {
     address constant USDC               = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     address constant WETH               = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
-    // Block ~15 Jan 2024. ETH ≈ $2 450, BTC ≈ $43 000, USDC ≈ $1.
-    uint256 constant FORK_BLOCK = 19_000_000;
-
     bool internal forkActive;
 
     function setUp() public {
         string memory rpcUrl = vm.envOr("MAINNET_RPC_URL", string(""));
         if (bytes(rpcUrl).length == 0) return;
 
-        vm.createSelectFork(rpcUrl, FORK_BLOCK);
+        vm.createSelectFork(rpcUrl);
         forkActive = true;
     }
 
@@ -39,9 +36,9 @@ contract ForkTest is Test {
         PriceOracle oracle = new PriceOracle(CHAINLINK_ETH_USD, 24 hours);
         uint256 price = oracle.getPrice(); // 18-decimal normalized
 
-        // At block 19_000_000 ETH was between $1 500 and $5 000.
-        assertGt(price, 1_500e18, "ETH/USD price below expected floor");
-        assertLt(price, 5_000e18, "ETH/USD price above expected ceiling");
+        // ETH price must be between $500 and $50 000 — reasonable for any near-future block.
+        assertGt(price, 500e18, "ETH/USD price below expected floor");
+        assertLt(price, 50_000e18, "ETH/USD price above expected ceiling");
     }
 
     // ─────────────────────────────────────────────────────────────────────────

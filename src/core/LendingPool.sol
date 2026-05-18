@@ -317,6 +317,7 @@ contract LendingPool is ReentrancyGuard, AccessControl {
             return;
         }
         uint256 elapsed = block.timestamp - pos.debtAccruedAt;
+        // slither-disable-next-line incorrect-equality
         if (elapsed == 0) return;
         uint256 rate = _borrowRate(debtToken);
         uint256 interest = (pos.debtAmount * rate * elapsed) / (1e18 * SECONDS_PER_YEAR);
@@ -330,6 +331,7 @@ contract LendingPool is ReentrancyGuard, AccessControl {
 
     function _borrowRate(address debtToken) internal view returns (uint256) {
         uint256 liquidity = totalLiquidity[debtToken];
+        // slither-disable-next-line incorrect-equality
         if (liquidity == 0) return BASE_RATE;
         uint256 utilization = (totalBorrowed[debtToken] * 1e18) / liquidity;
         return BASE_RATE + (utilization * RATE_SLOPE) / 1e18;

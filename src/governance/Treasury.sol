@@ -24,9 +24,11 @@ contract Treasury is AccessControl {
     }
 
     function releaseETH(address payable to, uint256 amount) external onlyRole(SPENDER_ROLE) {
+        require(to != address(0), "Treasury: zero address");
+        emit ETHReleased(to, amount);
+        // slither-disable-next-line arbitrary-send-eth
         (bool ok,) = to.call{value: amount}("");
         require(ok, "Treasury: ETH transfer failed");
-        emit ETHReleased(to, amount);
     }
 
     receive() external payable {}
