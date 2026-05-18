@@ -47,13 +47,13 @@ contract GovTokenV1 is
         _burn(msg.sender, amount);
     }
 
-    // OZ v5 clock override — use block number (default)
+    // OZ v5 clock override — timestamp mode (required for correct durations on L2)
     function clock() public view override returns (uint48) {
-        return uint48(block.number);
+        return uint48(block.timestamp);
     }
 
     function CLOCK_MODE() public pure override returns (string memory) {
-        return "mode=blocknumber&from=default";
+        return "mode=timestamp";
     }
 
     // Required overrides for OZ v5

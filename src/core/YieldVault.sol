@@ -141,7 +141,6 @@ contract YieldVaultV2 is YieldVaultV1 {
 
     function setPerformanceFee(uint256 fee, address recipient) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(fee <= 3000, "YieldVaultV2: fee > 30%");
-        require(recipient != address(0), "YieldVaultV2: zero recipient");
         performanceFee = fee;
         feeRecipient = recipient;
         emit PerformanceFeeSet(fee, recipient);

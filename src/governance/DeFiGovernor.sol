@@ -10,8 +10,10 @@ import "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.so
 import "@openzeppelin/contracts/governance/TimelockController.sol";
 
 /// @title DeFiGovernor — Full OZ Governor stack
-/// @dev Voting delay: 1 day (~7200 blocks), period: 1 week (~50400 blocks),
-///      quorum: 4%, proposal threshold: 1% of total supply, timelock: 2 days.
+/// @dev Voting delay: 1 day, period: 1 week, quorum: 4%, proposal threshold: 1%
+///      of total supply, timelock: 2 days. Uses timestamp-based clock so durations
+///      are correct on any chain regardless of block time (important on L2 where
+///      Optimism produces 2-second blocks).
 contract DeFiGovernor is
     Governor,
     GovernorSettings,
@@ -20,19 +22,19 @@ contract DeFiGovernor is
     GovernorVotesQuorumFraction,
     GovernorTimelockControl
 {
-    // 1 day in blocks at ~12s/block
-    uint48 public constant VOTING_DELAY_BLOCKS = 7_200;
-    // 1 week in blocks
-    uint32 public constant VOTING_PERIOD_BLOCKS = 50_400;
+    // 1 day, in seconds (matches GovToken's timestamp-mode clock)
+    uint48 public constant VOTING_DELAY = 1 days;
+    // 1 week, in seconds
+    uint32 public constant VOTING_PERIOD = 7 days;
     // 4% quorum
     uint256 public constant QUORUM_FRACTION = 4;
 
     constructor(IVotes _token, TimelockController _timelock)
         Governor("DeFiGovernor")
         GovernorSettings(
-            VOTING_DELAY_BLOCKS,    // voting delay
-            VOTING_PERIOD_BLOCKS,   // voting period
-            0                       // proposal threshold (set via initialSupply below)
+            VOTING_DELAY,    // voting delay  (seconds, since clock is timestamp-mode)
+            VOTING_PERIOD,   // voting period (seconds)
+            0                // proposal threshold (computed dynamically as 1% of supply)
         )
         GovernorVotes(_token)
         GovernorVotesQuorumFraction(QUORUM_FRACTION)

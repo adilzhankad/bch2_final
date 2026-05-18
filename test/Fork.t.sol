@@ -20,10 +20,24 @@ contract ForkTest is Test {
 
     function setUp() public {
         string memory rpcUrl = vm.envOr("MAINNET_RPC_URL", string(""));
+        // Skip if env is empty or still set to a known .env.example placeholder —
+        // a non-empty but unreachable URL would otherwise abort setUp with an
+        // RPC error and fail the whole suite in CI without a real key.
         if (bytes(rpcUrl).length == 0) return;
+        if (_endsWith(rpcUrl, "YOUR_KEY") || _endsWith(rpcUrl, "<key>")) return;
 
         vm.createSelectFork(rpcUrl);
         forkActive = true;
+    }
+
+    function _endsWith(string memory s, string memory suffix) private pure returns (bool) {
+        bytes memory sb = bytes(s);
+        bytes memory sx = bytes(suffix);
+        if (sx.length > sb.length) return false;
+        for (uint256 i; i < sx.length; ++i) {
+            if (sb[sb.length - sx.length + i] != sx[i]) return false;
+        }
+        return true;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
