@@ -90,16 +90,29 @@ function _sqrt(uint256 x) internal pure returns (uint256 y) {
 
 ## Test Suite
 
+**132 tests passing** (4 fork tests skipped without a mainnet RPC key).
+
 ```
 test/
-├── GovToken.t.sol       — 14 unit tests + upgrade path
-├── AMMPool.t.sol        — 14 unit tests + 3 fuzz tests
-├── LendingPool.t.sol    — 14 unit tests + 1 fuzz test
-├── YieldVault.t.sol     — 12 unit tests + 2 fuzz tests
-├── Governance.t.sol     — full lifecycle + vote tests
-├── ProtocolNFT.t.sol    — 12 unit tests
-└── Invariants.t.sol     — 5 invariant tests (k, LP supply, reserves, totalSupply, maxSupply)
+├── AMMPool.t.sol        — 18 (unit + 4 fuzz)
+├── GovToken.t.sol       — 16 (unit + 1 fuzz + upgrade path)
+├── Governance.t.sol     — 13 (full lifecycle + 2 fuzz + treasury control)
+├── LendingPool.t.sol    — 35 (unit + 2 fuzz)
+├── YieldVault.t.sol     — 12 (unit + 2 fuzz)
+├── ProtocolNFT.t.sol    — 15 (unit + 1 fuzz)
+├── Security.t.sol       —  7 (reentrancy + access-control case studies)
+├── Invariants.t.sol     — 10 (k, LP supply, reserves, totalSupply, maxSupply,
+│                              ERC-4626 round-trips, vault totalAssets)
+├── YulBenchmark.t.sol   —  6 (Yul sqrt vs Solidity, fuzz + gas)
+├── DeployVerify.t.sol   —  1 (post-deployment spec verification)
+└── Fork.t.sol           —  4 (Chainlink ETH/USD, USDC ERC-20 on mainnet)
 ```
+
+Breakdown vs. spec minimums:
+- Unit: 100+ (≥50 required)
+- Fuzz: 13 (≥10 required)
+- Invariant: 10 (≥5 required)
+- Fork: 4 (≥3 required)
 
 ---
 
@@ -124,7 +137,39 @@ forge coverage --report summary | tee coverage/coverage-report.md
 # Deploy to Optimism Sepolia
 cp .env.example .env   # fill PRIVATE_KEY, OPTIMISM_SEPOLIA_RPC_URL
 forge script script/Deploy.s.sol --rpc-url optimism_sepolia --broadcast --verify
+
+# Verify deployment (checks Timelock holds all admin roles, deployer has none)
+forge test --match-contract DeployVerifyTest -vv
 ```
+
+---
+
+## Deployed Contracts (Optimism Sepolia, chain id 11155420)
+
+All contracts verified on [sepolia-optimism.etherscan.io](https://sepolia-optimism.etherscan.io).
+
+| Contract | Address |
+|---|---|
+| PoolFactory   | [`0x854B46B5DD326308bE89CA0f87aF7aece562E690`](https://sepolia-optimism.etherscan.io/address/0x854B46B5DD326308bE89CA0f87aF7aece562E690) |
+| LendingPool   | [`0x8a7968Af678dc57F900Fee73944Ce175019f7141`](https://sepolia-optimism.etherscan.io/address/0x8a7968Af678dc57F900Fee73944Ce175019f7141) |
+| YieldVault    | [`0xc3918E6Dad6E59C5d33A31948CCfC13563bf0428`](https://sepolia-optimism.etherscan.io/address/0xc3918E6Dad6E59C5d33A31948CCfC13563bf0428) |
+| DeFiGovernor  | [`0xcc26c270bCB0989a9Eb1d4Fe4D26caE3C2073eca`](https://sepolia-optimism.etherscan.io/address/0xcc26c270bCB0989a9Eb1d4Fe4D26caE3C2073eca) |
+| ProtocolNFT   | [`0x6E84187542a1310f6dE482A4f8569F00eF6AbC62`](https://sepolia-optimism.etherscan.io/address/0x6E84187542a1310f6dE482A4f8569F00eF6AbC62) |
+
+### Post-Deployment Verification
+
+After deployment, the script [`script/Verify.s.sol`](script/Verify.s.sol) checks
+that the live state matches the spec:
+
+- Timelock delay is exactly 2 days
+- Governor parameters: 1-day delay, 7-day period, 4% quorum, 1% proposal threshold
+- Every `AccessControl` contract has the TimelockController as `DEFAULT_ADMIN_ROLE`
+- Ownable contracts (PoolFactory, mUSDC) are owned by the TimelockController
+- Deployer EOA holds **zero** admin roles anywhere — no backdoor
+
+The expected output and the full check list are in
+[`script/verification/output.md`](script/verification/output.md). The
+integration test `DeployVerifyTest` replays the same checks in CI on every push.
 
 ---
 
@@ -174,8 +219,7 @@ ETHERSCAN_API_KEY=...
 
 ## Team
 
-| Name | Role |
-|---|---|
-| Member 1 | Smart Contracts (AMM, Lending) |
-| Member 2 | Governance + Tokens |
-| Member 3 | Testing, Deployment, Frontend |
+| Name | GitHub | Area of Ownership |
+|---|---|---|
+| Adilzhan Kadyrov | [@adilzhankadyrov](https://github.com/adilzhankadyrov) | Lending pool, vault, deployment, frontend, CI |
+| Dastan Bekesh    | [@BekeshDastan](https://github.com/BekeshDastan)     | AMM, governance, tokens, subgraph |
