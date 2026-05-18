@@ -90,15 +90,17 @@ function _sqrt(uint256 x) internal pure returns (uint256 y) {
 
 ## Test Suite
 
-**136 tests passing** (4 fork tests skipped without a mainnet RPC key).
+**164 tests passing** (4 fork tests skipped without a mainnet RPC key).
+Line coverage **94.85%** across `src/` ([report](coverage/coverage-report.md)).
 
 ```
 test/
 ├── AMMPool.t.sol        — 18 (unit + 4 fuzz)
 ├── GovToken.t.sol       — 16 (unit + 1 fuzz + upgrade path)
-├── Governance.t.sol     — 13 (full lifecycle + 2 fuzz + treasury control)
+├── Governance.t.sol     — 17 (full lifecycle + 2 fuzz + cancel/queue/state)
 ├── LendingPool.t.sol    — 35 (unit + 2 fuzz)
-├── YieldVault.t.sol     — 12 (unit + 2 fuzz)
+├── YieldVault.t.sol     — 25 (unit + 2 fuzz + V1/V2 upgrade + pause + fees)
+├── PriceOracle.t.sol    — 11 (constructor reverts, stale/negative/incomplete-round)
 ├── ProtocolNFT.t.sol    — 15 (unit + 1 fuzz)
 ├── Security.t.sol       —  7 (reentrancy + access-control case studies)
 ├── Invariants.t.sol     — 13 (k, LP supply, reserves, totalSupply, maxSupply,
@@ -110,10 +112,11 @@ test/
 ```
 
 Breakdown vs. spec minimums:
-- Unit: 100+ (≥50 required)
+- Unit: 130+ (≥50 required)
 - Fuzz: 13 (≥10 required)
 - Invariant: 13 (≥5 required, incl. mandatory **treasury accounting**)
 - Fork: 4 (≥3 required)
+- Coverage: 94.85% (≥90% required)
 
 ---
 

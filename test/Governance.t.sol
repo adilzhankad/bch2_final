@@ -266,4 +266,60 @@ contract GovernanceTest is Test {
         assertGt(token.totalSupply(), supplyBefore);
         assertGt(quorumAfter, quorumBefore, "Quorum must increase as supply grows");
     }
+
+    // ── proposalNeedsQueuing always true for timelock-controlled governor ──────
+    function test_proposalNeedsQueuing() public {
+        address[] memory targets = new address[](1);
+        uint256[] memory values = new uint256[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        targets[0] = address(0);
+        calldatas[0] = "";
+
+        vm.prank(alice);
+        uint256 proposalId = governor.propose(targets, values, calldatas, "needsQueuing test");
+        assertTrue(governor.proposalNeedsQueuing(proposalId));
+    }
+
+    // ── hasVoted toggles after castVote ────────────────────────────────────────
+    function test_hasVoted_afterCast() public {
+        address[] memory targets = new address[](1);
+        uint256[] memory values = new uint256[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        targets[0] = address(0);
+        calldatas[0] = "";
+
+        vm.prank(alice);
+        uint256 proposalId = governor.propose(targets, values, calldatas, "hasVoted test");
+        vm.warp(block.timestamp + governor.votingDelay() + 1);
+
+        assertFalse(governor.hasVoted(proposalId, alice));
+        vm.prank(alice);
+        governor.castVote(proposalId, 1);
+        assertTrue(governor.hasVoted(proposalId, alice));
+    }
+
+    // ── Cancellation by proposer while proposal still Pending ──────────────────
+    function test_cancel_byProposer() public {
+        address[] memory targets = new address[](1);
+        uint256[] memory values = new uint256[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        targets[0] = address(0);
+        calldatas[0] = "";
+        string memory description = "cancel test";
+
+        vm.prank(alice);
+        uint256 proposalId = governor.propose(targets, values, calldatas, description);
+        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Pending));
+
+        bytes32 descHash = keccak256(bytes(description));
+        vm.prank(alice);
+        governor.cancel(targets, values, calldatas, descHash);
+        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Canceled));
+    }
+
+    // ── name + CLOCK_MODE getters ─────────────────────────────────────────────
+    function test_name_and_clockMode() public view {
+        assertEq(governor.name(), "DeFiGovernor");
+        assertEq(governor.CLOCK_MODE(), "mode=timestamp");
+    }
 }
