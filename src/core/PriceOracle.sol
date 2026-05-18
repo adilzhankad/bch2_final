@@ -34,6 +34,7 @@ contract PriceOracle {
 
     /// @notice Returns the latest price scaled to 18 decimals, reverts if stale
     function getPrice() external view returns (uint256 price) {
+        // slither-disable-next-line unused-return
         (uint80 roundId, int256 answer, , uint256 updatedAt, uint80 answeredInRound) =
             feed.latestRoundData();
 
@@ -59,6 +60,7 @@ contract PriceOracle {
         view
         returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)
     {
-        return feed.latestRoundData();
+        // slither-disable-next-line unused-return
+        (roundId, answer, startedAt, updatedAt, answeredInRound) = feed.latestRoundData();
     }
 }

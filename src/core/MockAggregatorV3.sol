@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 /// @title MockAggregatorV3 — configurable Chainlink feed mock for tests
 contract MockAggregatorV3 {
-    uint8 public decimals;
+    uint8 public immutable decimals;
     int256 public latestAnswer;
     uint256 public latestTimestamp;
     uint80 public latestRound;
