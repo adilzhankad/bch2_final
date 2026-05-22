@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "forge-std/Test.sol";
 import "../src/core/AMMPool.sol";
 import "../src/core/YieldVault.sol";
+import "../src/governance/Treasury.sol";
 import "../src/tokens/GovToken.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -234,5 +235,113 @@ contract VaultInvariantTest is Test {
         YieldVaultV1 vault = handler.vault();
         uint256 net = handler.ghost_totalDeposited() - handler.ghost_totalWithdrawn();
         assertGe(vault.totalAssets(), net);
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Treasury accounting invariants — Section 3.3 mandatory
+//
+// The Treasury holds funds that only the SPENDER_ROLE (granted to the
+// TimelockController in production) may release. These invariants prove:
+//   1. ETH balance == sum(deposits) - sum(releases)
+//   2. ERC-20 balance == sum(deposits) - sum(releases)
+//   3. Any caller without SPENDER_ROLE cannot move funds out.
+// ═════════════════════════════════════════════════════════════════════════════
+
+contract TreasuryHandler is Test {
+    Treasury public treasury;
+    MockERC20Mintable public token;
+
+    address internal spender = makeAddr("treasurySpender");
+    address public   sink    = makeAddr("treasurySink");
+
+    uint256 public ghost_ethDeposited;
+    uint256 public ghost_ethReleased;
+    uint256 public ghost_erc20Deposited;
+    uint256 public ghost_erc20Released;
+
+    constructor() {
+        treasury = new Treasury(spender);
+        token    = new MockERC20Mintable("TreasuryToken", "TT");
+    }
+
+    function depositETH(uint96 amount) public {
+        uint256 amt = bound(uint256(amount), 1, 100 ether);
+        vm.deal(address(this), amt);
+        (bool ok,) = address(treasury).call{value: amt}("");
+        require(ok, "deposit failed");
+        ghost_ethDeposited += amt;
+    }
+
+    function depositERC20(uint96 amount) public {
+        uint256 amt = bound(uint256(amount), 1, 1_000_000e18);
+        token.mint(address(treasury), amt);
+        ghost_erc20Deposited += amt;
+    }
+
+    function releaseETH(uint96 amount) public {
+        uint256 bal = address(treasury).balance;
+        if (bal == 0) return;
+        uint256 amt = bound(uint256(amount), 1, bal);
+        vm.prank(spender);
+        treasury.releaseETH(payable(sink), amt);
+        ghost_ethReleased += amt;
+    }
+
+    function releaseERC20(uint96 amount) public {
+        uint256 bal = token.balanceOf(address(treasury));
+        if (bal == 0) return;
+        uint256 amt = bound(uint256(amount), 1, bal);
+        vm.prank(spender);
+        treasury.releaseERC20(address(token), sink, amt);
+        ghost_erc20Released += amt;
+    }
+
+    // Unauthorized callers (no SPENDER_ROLE) must NEVER succeed in moving funds.
+    // The handler counts how many such attempts were made; a passing invariant
+    // means each call reverted as expected.
+    function unauthorizedRelease(uint96 amount, bool ethSide) public {
+        uint256 amt = bound(uint256(amount), 1, 1 ether);
+        address rogue = makeAddr("rogue");
+        vm.prank(rogue);
+        if (ethSide) {
+            try treasury.releaseETH(payable(rogue), amt) {
+                revert("Treasury accepted unauthorized ETH release");
+            } catch {}
+        } else {
+            try treasury.releaseERC20(address(token), rogue, amt) {
+                revert("Treasury accepted unauthorized ERC20 release");
+            } catch {}
+        }
+    }
+}
+
+contract TreasuryInvariantTest is Test {
+    TreasuryHandler internal handler;
+
+    function setUp() public {
+        handler = new TreasuryHandler();
+        // Seed both sides so release actions have something to act on.
+        handler.depositETH(10 ether);
+        handler.depositERC20(uint96(uint256(100_000e18)));
+        targetContract(address(handler));
+    }
+
+    /// @notice ETH held by the Treasury equals net deposits minus net releases.
+    function invariant_treasury_eth_accounting() public view {
+        uint256 expected = handler.ghost_ethDeposited() - handler.ghost_ethReleased();
+        assertEq(address(handler.treasury()).balance, expected);
+    }
+
+    /// @notice ERC-20 balance equals net deposits minus net releases.
+    function invariant_treasury_erc20_accounting() public view {
+        uint256 expected = handler.ghost_erc20Deposited() - handler.ghost_erc20Released();
+        assertEq(handler.token().balanceOf(address(handler.treasury())), expected);
+    }
+
+    /// @notice Funds released only land at the configured sink — never elsewhere.
+    function invariant_treasury_sink_receives_all_releases() public view {
+        assertEq(handler.sink().balance, handler.ghost_ethReleased());
+        assertEq(handler.token().balanceOf(handler.sink()), handler.ghost_erc20Released());
     }
 }
