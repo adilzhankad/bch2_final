@@ -32,9 +32,10 @@ contract Deploy is Script {
     address public factoryAddr;
     address public lendingAddr;
     address public vaultProxy;
-    address public ethOracleAddr;
+    address public dgtOracleAddr;
     address public treasuryAddr;
     address public mockStablecoinAddr;
+    address public ammPoolAddr;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -94,12 +95,14 @@ contract Deploy is Script {
 
     // ─── Step 3: core protocol ────────────────────────────────────────────────
     function _deployCore(address deployer) internal {
-        // Use mock feeds for testnet; replace with real Chainlink addresses for mainnet
-        MockAggregatorV3 ethFeed  = new MockAggregatorV3(8, 3000e8);
+        // Use mock feeds for testnet; replace with real Chainlink addresses for mainnet.
+        // DGT is seeded into the AMM at an implied price of $3 (300k mUSDC / 100k DGT),
+        // so the lending oracle must quote $3/DGT — otherwise health-factor math is bogus.
+        MockAggregatorV3 dgtFeed  = new MockAggregatorV3(8, 3e8);
         MockAggregatorV3 usdcFeed = new MockAggregatorV3(8, 1e8);
-        ethOracleAddr = address(new PriceOracle(address(ethFeed),  3600));
+        dgtOracleAddr = address(new PriceOracle(address(dgtFeed),  3600));
         address usdcOracleAddr = address(new PriceOracle(address(usdcFeed), 3600));
-        console.log("ETH PriceOracle: ", ethOracleAddr);
+        console.log("DGT PriceOracle: ", dgtOracleAddr);
         console.log("USDC PriceOracle:", usdcOracleAddr);
 
         factoryAddr = address(new PoolFactory());
@@ -112,10 +115,26 @@ contract Deploy is Script {
         mockStablecoinAddr = address(mockUsdc);
         console.log("MockERC20 (mUSDC):", mockStablecoinAddr);
 
+        // Create the GovToken / mUSDC AMM pool and seed it with initial liquidity
+        // so the frontend has something to swap against right after deploy.
+        // PoolFactory sorts tokens, so map the seed amounts to whichever side
+        // ended up as token0 in the deployed pool.
+        ammPoolAddr = PoolFactory(factoryAddr).createPool(govProxy, mockStablecoinAddr);
+        uint256 dgtSeed  = 100_000e18; // 100k DGT
+        uint256 usdcSeed = 300_000e18; // 300k mUSDC → implied ~$3 per DGT
+        GovTokenV1(govProxy).approve(ammPoolAddr, dgtSeed);
+        mockUsdc.approve(ammPoolAddr, usdcSeed);
+        address poolToken0 = address(AMMPool(ammPoolAddr).token0());
+        (uint256 a0, uint256 a1) = poolToken0 == govProxy
+            ? (dgtSeed,  usdcSeed)
+            : (usdcSeed, dgtSeed);
+        AMMPool(ammPoolAddr).addLiquidity(a0, a1, 0, 0, deployer);
+        console.log("AMMPool (DGT/mUSDC):", ammPoolAddr);
+
         lendingAddr = address(new LendingPool(deployer));
         // govToken  → collateral only  (LTV 75%, liq threshold 80%)
         LendingPool(lendingAddr).configureAsset(
-            govProxy, ethOracleAddr, 0.75e18, 0.80e18, 0.05e18, true, false
+            govProxy, dgtOracleAddr, 0.75e18, 0.80e18, 0.05e18, true, false
         );
         // mUSDC     → borrowable debt token (LTV 90%, liq threshold 95%, 1% bonus)
         LendingPool(lendingAddr).configureAsset(
@@ -199,11 +218,12 @@ contract Deploy is Script {
         console.log("TimelockCtrl:    ", timelockAddr);
         console.log("DeFiGovernor:    ", governorAddr);
         console.log("PoolFactory:     ", factoryAddr);
+        console.log("AMMPool DGT/mUSDC:", ammPoolAddr);
         console.log("LendingPool:     ", lendingAddr);
         console.log("MockERC20 mUSDC: ", mockStablecoinAddr);
         console.log("YieldVault:      ", vaultProxy);
         console.log("Treasury:        ", treasuryAddr);
-        console.log("ETH Oracle:      ", ethOracleAddr);
+        console.log("DGT Oracle:      ", dgtOracleAddr);
         console.log("\nAdmin owner of all contracts: TimelockController");
         console.log("Deployer admin roles: NONE");
     }

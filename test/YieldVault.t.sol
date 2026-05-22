@@ -183,6 +183,22 @@ contract YieldVaultTest is Test {
         v2.setPerformanceFee(500, alice);
     }
 
+    function test_v2_setPerformanceFee_revert_zeroRecipientWithFee() public {
+        YieldVaultV2 v2 = _upgradeToV2();
+        vm.expectRevert(YieldVaultV2.InvalidFeeRecipient.selector);
+        vm.prank(admin);
+        v2.setPerformanceFee(500, address(0));
+    }
+
+    function test_v2_setPerformanceFee_zeroFee_allowsZeroRecipient() public {
+        YieldVaultV2 v2 = _upgradeToV2();
+        // fee == 0 is treated as "feature disabled" — recipient may be address(0)
+        vm.prank(admin);
+        v2.setPerformanceFee(0, address(0));
+        assertEq(v2.performanceFee(), 0);
+        assertEq(v2.feeRecipient(), address(0));
+    }
+
     function test_v2_injectYieldWithFee_routesFee() public {
         YieldVaultV2 v2 = _upgradeToV2();
         address feeRecipient = makeAddr("feeRecipient");
@@ -209,55 +225,31 @@ contract YieldVaultTest is Test {
         assertEq(asset.balanceOf(address(vault)), vaultBefore + 190e18);
     }
 
-    function test_v2_injectYieldWithFee_noRecipient_skipsFee() public {
+    function test_v2_injectYieldWithFee_revert_notConfigured() public {
         YieldVaultV2 v2 = _upgradeToV2();
-        // Fee bps set but recipient is address(0) → the `if (fee > 0 && feeRecipient != 0)`
-        // branch is skipped; only `net` (amount - fee) is transferred to the vault.
-        // The fee component stays in the caller's wallet (covers the false-branch of the if).
-        vm.prank(admin);
-        v2.setPerformanceFee(500, address(0));
-
-        asset.mint(alice, 1000e18);
-        vm.startPrank(alice);
-        asset.approve(address(vault), type(uint256).max);
-        vault.deposit(1000e18, alice);
-        vm.stopPrank();
-
-        asset.mint(admin, 200e18);
+        // Default state: performanceFee = 0, feeRecipient = 0 → injection must revert
+        // so callers don't accidentally bypass the fee split before setup.
+        asset.mint(admin, 100e18);
         vm.startPrank(admin);
         asset.approve(address(vault), type(uint256).max);
-        uint256 vaultBefore   = asset.balanceOf(address(vault));
-        uint256 adminBefore   = asset.balanceOf(admin);
-        v2.injectYieldWithFee(200e18);
+        vm.expectRevert(YieldVaultV2.FeeNotConfigured.selector);
+        v2.injectYieldWithFee(100e18);
         vm.stopPrank();
-
-        // net = 200 - (200 * 500 / 10000) = 200 - 10 = 190 enters the vault
-        assertEq(asset.balanceOf(address(vault)), vaultBefore + 190e18);
-        // the 10e18 fee component stays in admin's wallet (skipped branch)
-        assertEq(asset.balanceOf(admin), adminBefore - 190e18);
     }
 
-    function test_v2_injectYieldWithFee_zeroFee_routesAllToVault() public {
+    function test_v2_injectYieldWithFee_revert_whenFeeZero() public {
         YieldVaultV2 v2 = _upgradeToV2();
-        // performanceFee = 0 → fee = 0, the inner `if (fee > 0 && ...)` is false,
-        // and the full amount enters the vault.
+        // setPerformanceFee(0, recipient) is allowed (feature disabled) but
+        // injectYieldWithFee must reject — V2's whole purpose is the fee path.
         vm.prank(admin);
         v2.setPerformanceFee(0, makeAddr("ignored"));
-
-        asset.mint(alice, 1000e18);
-        vm.startPrank(alice);
-        asset.approve(address(vault), type(uint256).max);
-        vault.deposit(1000e18, alice);
-        vm.stopPrank();
 
         asset.mint(admin, 100e18);
         vm.startPrank(admin);
         asset.approve(address(vault), type(uint256).max);
-        uint256 vaultBefore = asset.balanceOf(address(vault));
+        vm.expectRevert(YieldVaultV2.FeeNotConfigured.selector);
         v2.injectYieldWithFee(100e18);
         vm.stopPrank();
-
-        assertEq(asset.balanceOf(address(vault)), vaultBefore + 100e18);
     }
 
     // ── Pause guard on every ERC-4626 entry point ─────────────────────────────

@@ -10,9 +10,9 @@ dataSources:
     name: PoolFactory
     network: optimism-sepolia
     source:
-      address: "0x854B46B5DD326308bE89CA0f87aF7aece562E690"
+      address: "0x07Ae07f70E337Fa545Cd46f1FAe3F00B2Ae8Dd0D"
       abi: PoolFactory
-      startBlock: 43613437
+      startBlock: 43690837
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -33,9 +33,9 @@ dataSources:
     name: LendingPool
     network: optimism-sepolia
     source:
-      address: "0x8a7968Af678dc57F900Fee73944Ce175019f7141"
+      address: "0x24826A3081984aeBB141A14E6BA6312682e455d2"
       abi: LendingPool
-      startBlock: 43613437
+      startBlock: 43690837
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -68,9 +68,9 @@ dataSources:
     name: YieldVault
     network: optimism-sepolia
     source:
-      address: "0xc3918E6Dad6E59C5d33A31948CCfC13563bf0428"
+      address: "0x60BD1A570477e538F60e0F0B1F1222b629F02d84"
       abi: YieldVault
-      startBlock: 43613437
+      startBlock: 43690837
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -97,9 +97,9 @@ dataSources:
     name: DeFiGovernor
     network: optimism-sepolia
     source:
-      address: "0xcc26c270bCB0989a9Eb1d4Fe4D26caE3C2073eca"
+      address: "0xbBFeB60EdAa64B7726Bcfd5c67EDAc0d3536D54C"
       abi: DeFiGovernor
-      startBlock: 43613437
+      startBlock: 43690837
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -128,9 +128,9 @@ dataSources:
     name: ProtocolNFT
     network: optimism-sepolia
     source:
-      address: "0x6E84187542a1310f6dE482A4f8569F00eF6AbC62"
+      address: "0x43c3Cf94517e7d8b528fF3dc8C4540334c711572"
       abi: ProtocolNFT
-      startBlock: 43613437
+      startBlock: 43690837
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7

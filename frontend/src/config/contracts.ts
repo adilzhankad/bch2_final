@@ -1,14 +1,23 @@
 // Contract addresses — populated from env vars after L2 deployment
+export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
+
 export const ADDRESSES = {
-  govToken:    (process.env.NEXT_PUBLIC_GOV_TOKEN    ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
-  debtToken:   (process.env.NEXT_PUBLIC_DEBT_TOKEN   ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
-  ammPool:     (process.env.NEXT_PUBLIC_AMM_POOL     ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
-  yieldVault:  (process.env.NEXT_PUBLIC_YIELD_VAULT  ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
-  lendingPool: (process.env.NEXT_PUBLIC_LENDING_POOL ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
-  governor:    (process.env.NEXT_PUBLIC_GOVERNOR     ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
-  timelock:    (process.env.NEXT_PUBLIC_TIMELOCK     ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
-  treasury:    (process.env.NEXT_PUBLIC_TREASURY     ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
+  govToken:    (process.env.NEXT_PUBLIC_GOV_TOKEN     ?? ZERO_ADDRESS) as `0x${string}`,
+  debtToken:   (process.env.NEXT_PUBLIC_DEBT_TOKEN    ?? ZERO_ADDRESS) as `0x${string}`,
+  ammPool:     (process.env.NEXT_PUBLIC_AMM_POOL      ?? ZERO_ADDRESS) as `0x${string}`,
+  poolFactory: (process.env.NEXT_PUBLIC_POOL_FACTORY  ?? ZERO_ADDRESS) as `0x${string}`,
+  yieldVault:  (process.env.NEXT_PUBLIC_YIELD_VAULT   ?? ZERO_ADDRESS) as `0x${string}`,
+  lendingPool: (process.env.NEXT_PUBLIC_LENDING_POOL  ?? ZERO_ADDRESS) as `0x${string}`,
+  governor:    (process.env.NEXT_PUBLIC_GOVERNOR      ?? ZERO_ADDRESS) as `0x${string}`,
+  timelock:    (process.env.NEXT_PUBLIC_TIMELOCK      ?? ZERO_ADDRESS) as `0x${string}`,
+  treasury:    (process.env.NEXT_PUBLIC_TREASURY      ?? ZERO_ADDRESS) as `0x${string}`,
 } as const;
+
+export const POOL_FACTORY_ABI = [
+  { type: "function", name: "getPool", inputs: [{ name: "tokenA", type: "address" }, { name: "tokenB", type: "address" }], outputs: [{ type: "address" }], stateMutability: "view" },
+  { type: "function", name: "allPools", inputs: [{ name: "i", type: "uint256" }], outputs: [{ type: "address" }], stateMutability: "view" },
+  { type: "function", name: "allPoolsLength", inputs: [], outputs: [{ type: "uint256" }], stateMutability: "view" },
+] as const;
 
 // ─── Minimal ABIs (only functions used by the frontend) ─────────────────────
 
@@ -72,6 +81,19 @@ export const GOVERNOR_ABI = [
   { type: "function", name: "votingPeriod",     inputs: [], outputs: [{ type: "uint256" }], stateMutability: "view" },
   { type: "function", name: "quorum",           inputs: [{ name: "blockNumber", type: "uint256" }], outputs: [{ type: "uint256" }], stateMutability: "view" },
   { type: "function", name: "getVotes",         inputs: [{ name: "account", type: "address" }, { name: "blockNumber", type: "uint256" }], outputs: [{ type: "uint256" }], stateMutability: "view" },
+  { type: "function", name: "proposalThreshold",inputs: [], outputs: [{ type: "uint256" }], stateMutability: "view" },
+  { type: "function", name: "clock",            inputs: [], outputs: [{ type: "uint48" }], stateMutability: "view" },
+  {
+    type: "function", name: "propose",
+    inputs: [
+      { name: "targets",     type: "address[]" },
+      { name: "values",      type: "uint256[]" },
+      { name: "calldatas",   type: "bytes[]"   },
+      { name: "description", type: "string"    },
+    ],
+    outputs: [{ type: "uint256" }],
+    stateMutability: "nonpayable",
+  },
   {
     type: "event", name: "ProposalCreated",
     inputs: [
@@ -86,6 +108,18 @@ export const GOVERNOR_ABI = [
       { name: "description", type: "string", indexed: false },
     ],
   },
+] as const;
+
+export const TREASURY_ABI = [
+  { type: "function", name: "releaseERC20", inputs: [
+    { name: "token",  type: "address" },
+    { name: "to",     type: "address" },
+    { name: "amount", type: "uint256" },
+  ], outputs: [], stateMutability: "nonpayable" },
+  { type: "function", name: "releaseETH", inputs: [
+    { name: "to",     type: "address" },
+    { name: "amount", type: "uint256" },
+  ], outputs: [], stateMutability: "nonpayable" },
 ] as const;
 
 // ProposalState enum from OZ Governor

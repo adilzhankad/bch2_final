@@ -150,6 +150,7 @@ contract LendingPool is ReentrancyGuard, AccessControl {
         if (amount == 0) revert ZeroAmount();
         uint256 ts = totalLenderShares[token];
         uint256 tl = totalLiquidity[token];
+        if (ts == 0 || tl == 0) revert InsufficientLiquidity();
         // Shares needed to redeem `amount`. Round up to protect the pool.
         uint256 shares = (amount * ts + tl - 1) / tl;
         if (lenderShares[token][msg.sender] < shares) revert InsufficientLiquidity();
