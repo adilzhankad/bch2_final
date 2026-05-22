@@ -139,19 +139,28 @@ contract YieldVaultV2 is YieldVaultV1 {
 
     event PerformanceFeeSet(uint256 fee, address recipient);
 
+    error FeeNotConfigured();
+    error InvalidFeeRecipient();
+
     function setPerformanceFee(uint256 fee, address recipient) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(fee <= 3000, "YieldVaultV2: fee > 30%");
+        // A non-zero fee must always have a real recipient — otherwise tokens
+        // would silently stay with the caller and the fee would be inert.
+        if (fee > 0 && recipient == address(0)) revert InvalidFeeRecipient();
         performanceFee = fee;
         feeRecipient = recipient;
         emit PerformanceFeeSet(fee, recipient);
     }
 
     function injectYieldWithFee(uint256 amount) external onlyRole(YIELD_MANAGER_ROLE) {
+        // V2's whole purpose is the fee split — guard against accidentally
+        // calling this before setPerformanceFee() is wired up.
+        if (performanceFee == 0 || feeRecipient == address(0)) revert FeeNotConfigured();
         uint256 fee = (amount * performanceFee) / 10_000;
         uint256 net = amount - fee;
         IERC20 underlying = IERC20(asset());
         // Route fee directly from caller to recipient; only net enters the vault.
-        if (fee > 0 && feeRecipient != address(0)) {
+        if (fee > 0) {
             SafeERC20.safeTransferFrom(underlying, msg.sender, feeRecipient, fee);
         }
         SafeERC20.safeTransferFrom(underlying, msg.sender, address(this), net);
